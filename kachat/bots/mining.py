@@ -1,0 +1,143 @@
+"""Mining bot: a message for every block reward paid to the watched address
+(the v1 watcher's job), plus optional pool-hashrate drop alerts.
+
+Rewards come from a UtxosChanged subscription on the mining address (the
+daemon owns the stream): every new coinbase output of at least minRewardKas.
+Hashrate is the stratum bridge's per-worker total (BRIDGE_STATS_URL, GH/s).
+"""
+from __future__ import annotations
+
+from typing import List, Optional
+
+from ..address import short_address
+from .base import Bot, Question, fmt_hashrate, fmt_kas, parse_address_answer, parse_number
+
+HASHRATE_POLL = 60.0
+HASHRATE_WINDOW = 30 * 60      # baseline = average over the last 30 minutes before a drop
+
+
+class MiningBot(Bot):
+    TYPE = "mining"
+    TITLE = "Mining bot"
+
+    def __init__(self, *a, **kw):
+        self._hr_samples: List[tuple] = []
+        self._hr_last_poll = 0.0
+        self._hr_low_count = 0
+        super().__init__(*a, **kw)
+
+    def default_settings(self) -> dict:
+        return {"address": None, "minRewardKas": 0, "hashrateDropPct": None}
+
+    def questions(self) -> List[Question]:
+        def parse_min(t):
+            return parse_number(t, minimum=0, what="an amount in KAS, like 0 or 1.5")
+
+        def parse_drop(t):
+            return parse_number(t, minimum=1, maximum=99, allow_none=True, what="a percentage, like 30")
+
+        qs = [
+            Question("address", "Which mining address should I watch? (paste the kaspa: address)",
+                     parse_address_answer(self.ctx.network, not_self=self.address)),
+            Question("minRewardKas", "Smallest reward to report, in KAS? (0 = every block)", parse_min, 0,
+                     show=lambda v: f"{v:g} KAS"),
+            Question("hashrateDropPct", "Alert me when the pool hashrate drops by how many %? (e.g. 30, or no)",
+                     parse_drop, None, show=lambda v: "no" if v is None else f"{v:g}%"),
+        ]
+        # Without the stratum bridge there is no hashrate to watch: don't ask.
+        return qs if self.ctx.fetch_hashrate else qs[:2]
+
+    def describe_settings(self) -> str:
+        s = self.settings
+        drop = s.get("hashrateDropPct")
+        return (f"Watching {s.get('address')}\n"
+                f"Reporting rewards of at least {float(s.get('minRewardKas') or 0):g} KAS\n"
+                f"Hashrate drop alerts: {'off' if drop is None else f'{drop:g}%'}")
+
+    def summary(self) -> str:
+        addr = self.settings.get("address")
+        return f"Watching {short_address(addr)} for blocks" if addr else "Not set up"
+
+    def sample_notification(self) -> str:
+        return self.reward_text([123456789], 98765432100, None)
+
+    def watched_addresses(self) -> set:
+        a = self.settings.get("address")
+        return {a} if a and self.enabled and self.stage in ("active", "paused") else set()
+
+    def on_settings_changed(self) -> None:
+        self._hr_samples = []
+        self._hr_low_count = 0
+        self.data["hashrateAlerted"] = False
+
+    def reward_text(self, amounts: List[int], balance: Optional[int], hashrate: Optional[float]) -> str:
+        if len(amounts) == 1:
+            head = f"Block reward: {fmt_kas(amounts[0])}"
+        else:
+            head = f"{len(amounts)} block rewards: {fmt_kas(sum(amounts))}"
+        lines = [head, f"Balance: {fmt_kas(balance)}"]
+        if hashrate is not None:
+            lines.append(f"Hashrate: {fmt_hashrate(hashrate)}")
+        return "\n".join(lines)
+
+    async def on_utxos(self, address: str, added: list, removed: list) -> None:
+        s = self.settings
+        if address != s.get("address") or self.stage != "active":
+            return
+        min_sompi = int(round(float(s.get("minRewardKas") or 0) * 100_000_000))
+        rewards = []
+        for e in added:
+            if not e.get("isCoinbase") or e["amount"] <= 0 or e["amount"] < min_sompi:
+                continue
+            key = f"reward:{e['txid']}:{e['index']}"
+            if self.seen(key):
+                continue
+            self.mark_seen(key)
+            rewards.append(e["amount"])
+        if not rewards:
+            return
+        balance = await self.ctx.get_balance(address)
+        hashrate = await self.ctx.fetch_hashrate() if self.ctx.fetch_hashrate else None
+        await self.notify(self.reward_text(rewards, balance, hashrate))
+
+    async def tick(self, now: float) -> None:
+        drop = self.settings.get("hashrateDropPct")
+        if drop is None or self.stage != "active" or not self.ctx.fetch_hashrate:
+            return
+        if now - self._hr_last_poll < HASHRATE_POLL:
+            return
+        self._hr_last_poll = now
+        hr = await self.ctx.fetch_hashrate()
+        if hr is None:
+            return
+        await self.check_hashrate(now, hr, float(drop))
+
+    async def check_hashrate(self, now: float, hr: float, drop: float) -> None:
+        past = [v for (t, v) in self._hr_samples if now - t <= HASHRATE_WINDOW]
+        baseline = sum(past) / len(past) if past else None
+        alerted = bool(self.data.get("hashrateAlerted"))
+        if baseline and baseline > 0:
+            fall = (baseline - hr) / baseline * 100
+            if not alerted:
+                if fall >= drop:
+                    self._hr_low_count += 1
+                    if self._hr_low_count >= 2:          # two polls in a row, not a blip
+                        self.data["hashrateAlerted"] = True
+                        self.data["hashrateBefore"] = baseline
+                        self.save()
+                        await self.notify(f"Hashrate dropped {fall:.0f}%: {fmt_hashrate(hr)} "
+                                          f"(was {fmt_hashrate(baseline)})")
+                    return                               # keep low readings out of the baseline
+                self._hr_low_count = 0
+        if alerted:
+            before = float(self.data.get("hashrateBefore") or 0)
+            if before and hr >= before * (1 - drop / 200):
+                self.data["hashrateAlerted"] = False
+                self._hr_low_count = 0
+                self.save()
+                await self.notify(f"Hashrate is back: {fmt_hashrate(hr)}")
+            else:
+                return
+        self._hr_samples.append((now, hr))
+        self._hr_samples = [(t, v) for (t, v) in self._hr_samples if now - t <= HASHRATE_WINDOW]
+

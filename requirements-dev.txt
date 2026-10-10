@@ -1,0 +1,5 @@
+# Tests: python -m pytest   (no node, no network, no kaspa SDK needed)
+pytest>=7
+grpcio==1.64.1
+grpcio-tools==1.64.1
+cryptography>=42.0.0

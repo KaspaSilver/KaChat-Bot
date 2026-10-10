@@ -1,37 +1,27 @@
-# ── kaspa-block-notifier Dockerfile ──────────────────────────────────────────
-# Builds a small Python container that:
-#   1. Installs grpcio, grpcio-tools, and the Kaspa Python SDK
-#   2. Compiles your proto files into Python stubs
-#   3. Runs watcher.py on startup
-#
-# USAGE:
-#   Place your proto files (messages.proto, rpc.proto, p2p.proto) in ./proto/
-#   Then: docker compose up -d
+# ── KaChat Bot v2 ────────────────────────────────────────────────────────────
+# One container, several bots (mining / price / wallet), each with its own
+# wallet and owner. The Kaspa Quick Start panel writes /conf/bots.json and
+# reads /state/; see README.md.
+#   1. installs grpcio, the Kaspa Python SDK and cryptography
+#   2. compiles proto/ into Python stubs (gRPC MessageStream to kaspad)
+#   3. runs botd.py
 # ─────────────────────────────────────────────────────────────────────────────
 
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# ── System deps (needed by some grpcio builds on ARM) ────────────────────────
+# Some grpcio builds on ARM need a compiler.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc \
         g++ \
         libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Python deps ───────────────────────────────────────────────────────────────
-# grpcio-tools  : protoc compiler wrapper
-# kaspa         : official Kaspa Python SDK (Rust-backed via PyO3)
-# cryptography  : secp256k1 helpers used by the SDK
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Proto compilation ─────────────────────────────────────────────────────────
-# Copy all .proto files from your local ./proto/ directory into the image
-# and compile them to Python stubs right here at build time.
 COPY proto/ ./proto/
-
 RUN python -m grpc_tools.protoc \
         -I./proto \
         --python_out=. \
@@ -40,15 +30,12 @@ RUN python -m grpc_tools.protoc \
         ./proto/rpc.proto \
     && echo "Proto files compiled successfully."
 
-# ── Application code ──────────────────────────────────────────────────────────
-COPY watcher.py .
-# Wallet generator, run on its own (python gen_wallet.py) by the control panel
-# to create the sending wallet. Uses the same SDK as watcher.py, so the address
-# it prints is exactly the one the bot spends from.
+COPY kachat/ ./kachat/
+COPY botd.py .
+# Wallet generator, run on its own by the panel (python gen_wallet.py --network ...).
+# Same SDK the bots sign with, so the address it prints is the one they spend from.
 COPY gen_wallet.py .
 
-# ── Runtime ───────────────────────────────────────────────────────────────────
-# Unbuffered output so logs appear immediately in `docker logs`
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "-u", "watcher.py"]
+CMD ["python", "-u", "botd.py"]

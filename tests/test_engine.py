@@ -1,0 +1,366 @@
+"""Conversation engine and the three bot types, with sending and the chain mocked."""
+from conftest import BOT_KEY, OTHER_KEY, USER_KEY, FakeStore, addr, make_cfg, run
+
+from kachat.bots.base import PRIVATE_REPLY
+
+USER = addr(USER_KEY)
+OTHER = addr(OTHER_KEY)
+WATCH = addr("44" * 32)
+WATCH2 = addr("55" * 32)
+BOTADDR = addr(BOT_KEY)
+
+_n = [0]
+
+
+def tx():
+    _n[0] += 1
+    return f"{_n[0]:064x}"
+
+
+def say(bot, text, sender=USER):
+    run(bot.handle_message(sender, text, tx()))
+
+
+def texts(ctxf, to=USER):
+    return [t for (_, r, t) in ctxf.sent if r == to]
+
+
+def paired(make_bot, ctxf, bot_type, answers, **kw):
+    bot = make_bot(bot_type, **kw)
+    say(bot, "hi 482915")
+    for a in answers:
+        say(bot, a)
+    assert bot.stage == "active", texts(ctxf)
+    ctxf.sent.clear()
+    return bot
+
+
+# ── pairing and strangers ───────────────────────────────────────────────────
+
+def test_stranger_gets_one_private_reply_per_day(make_bot, ctxf):
+    bot = make_bot("mining")
+    say(bot, "hello", OTHER)
+    say(bot, "hello again", OTHER)
+    assert texts(ctxf, OTHER) == [PRIVATE_REPLY]
+    ctxf.clock.t += 86400
+    say(bot, "next day", OTHER)
+    assert texts(ctxf, OTHER) == [PRIVATE_REPLY, PRIVATE_REPLY]
+    assert bot.owner is None and bot.stage == "awaiting_pairing"
+
+
+def test_wrong_code_does_not_pair_and_code_must_be_whole(make_bot, ctxf):
+    bot = make_bot("mining")
+    say(bot, "1482915")            # code embedded in a longer number
+    say(bot, "482916")
+    assert bot.owner is None
+
+
+def test_pairing_then_setup_questions(make_bot, ctxf):
+    bot = make_bot("mining")
+    say(bot, "my code is 482915")
+    assert bot.owner == USER and bot.stage == "setup"
+    first = texts(ctxf)[0]
+    assert first.startswith("Paired!") and "1/3" in first and "mining address" in first
+    say(bot, "kaspa:notanaddress")
+    assert "doesn't look right" in texts(ctxf)[-1] and "1/3" in texts(ctxf)[-1]
+    say(bot, addr("44" * 32, "testnet-10"))           # wrong network
+    assert "kaspatest" in texts(ctxf)[-1]
+    say(bot, BOTADDR)                                 # its own wallet: refused
+    assert "my own address" in texts(ctxf)[-1]
+    say(bot, WATCH)
+    assert "2/3" in texts(ctxf)[-1]
+    say(bot, "abc")
+    assert "2/3" in texts(ctxf)[-1]
+    say(bot, "skip")
+    assert "3/3" in texts(ctxf)[-1]
+    say(bot, "30")
+    assert bot.stage == "active"
+    assert bot.settings == {"address": WATCH, "minRewardKas": 0, "hashrateDropPct": 30.0}
+    assert texts(ctxf)[-1].startswith("All set!")
+
+
+def test_after_pairing_strangers_are_ignored(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    say(bot, "482915", OTHER)
+    say(bot, "status", OTHER)
+    assert ctxf.sent == [] and bot.owner == USER
+
+
+def test_commands(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "1.5", "no"])
+    say(bot, "help")
+    assert "Commands" in texts(ctxf)[-1]
+    say(bot, "Status")
+    assert texts(ctxf)[-1].startswith("Active.") and "Bot wallet" in texts(ctxf)[-1]
+    say(bot, "settings")
+    assert "1.5 KAS" in texts(ctxf)[-1]
+    say(bot, "pause")
+    assert bot.stage == "paused"
+    say(bot, "/resume")
+    assert bot.stage == "active"
+    say(bot, "test")
+    assert texts(ctxf)[-1].startswith("Test: Block reward")
+    say(bot, "what?")
+    assert "help" in texts(ctxf)[-1]
+    say(bot, "change")
+    assert bot.stage == "setup" and "now:" in texts(ctxf)[-1]
+    say(bot, "skip")
+    say(bot, "2")
+    say(bot, "skip")
+    assert bot.stage == "active" and bot.settings["minRewardKas"] == 2.0 and bot.settings["address"] == WATCH
+
+
+def test_commands_during_setup_reask(make_bot, ctxf):
+    bot = make_bot("wallet")
+    say(bot, "482915")
+    say(bot, "pause")
+    assert "finish setup" in texts(ctxf)[-1] and "1/2" in texts(ctxf)[-1]
+    say(bot, "help")
+    assert "Commands" in texts(ctxf)[-1] and "1/2" in texts(ctxf)[-1]
+    say(bot, "skip")                       # required question
+    assert "needed" in texts(ctxf)[-1]
+
+
+def test_one_reply_per_message_and_history(make_bot, ctxf):
+    store = FakeStore()
+    bot = make_bot("price", store=store)
+    say(bot, "482915")
+    assert len(ctxf.sent) == 1
+    assert [h["dir"] for h in store.history] == ["in", "out"]
+    assert store.history[1]["txid"]
+
+
+def test_rate_limit_caps_spending(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "no"], max_out=5)
+    ctxf.clock.t += 3601                     # setup itself used the hour's budget
+    for _ in range(10):
+        say(bot, "status")
+    assert len(ctxf.sent) == 5
+    assert "Rate limit" in (bot.error or "")
+    run(bot.notify("alert"))
+    assert len(ctxf.sent) == 5
+    ctxf.clock.t += 3601
+    say(bot, "status")
+    assert len(ctxf.sent) == 6
+
+
+def test_rate_limit_counts_everything(make_bot, ctxf):
+    bot = make_bot("mining", max_out=3)
+    for k in range(6):
+        say(bot, "hi", addr(f"{k + 60:02x}" * 32))
+    assert len(ctxf.sent) == 3
+
+
+def test_reset_owner_forgets_everything(make_bot, ctxf):
+    store = FakeStore()
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], store=store)
+    bot.apply_config(make_cfg("mining", reset="n1"))
+    assert bot.owner is None and bot.settings == {} and bot.stage == "awaiting_pairing"
+    bot.apply_config(make_cfg("mining", reset="n1"))     # same nonce: no second reset
+    say(bot, "482915", OTHER)
+    assert bot.owner == OTHER
+    bot.apply_config(make_cfg("mining", reset="n1"))
+    assert bot.owner == OTHER
+    bot.apply_config(make_cfg("mining", reset="n2"))
+    assert bot.owner is None
+
+
+def test_state_survives_restart(make_bot, ctxf):
+    store = FakeStore()
+    paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], store=store)
+    seen = list(store.data["seen"])
+    again = make_bot("mining", store=store)
+    assert again.owner == USER and again.stage == "active" and again.settings["address"] == WATCH
+    run(again.handle_message(USER, "status", seen[-1]))      # duplicate txid: ignored
+    assert ctxf.sent == []
+
+
+def test_disabled_bot_is_silent(make_bot, ctxf):
+    bot = make_bot("mining", enabled=False)
+    say(bot, "482915")
+    assert ctxf.sent == [] and bot.status()["stage"] == "disabled"
+
+
+def test_send_failure_is_reported_not_raised(make_bot, ctxf):
+    bot = make_bot("mining")
+    ctxf.fail = True
+    say(bot, "482915")
+    assert bot.owner == USER and "Could not send" in bot.error
+
+
+def test_status_contract_shape(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    bot.balance = 1_000_000_000
+    s = bot.status()
+    assert set(s) == {"id", "type", "address", "balanceSompi", "funded", "stage", "owner", "settings",
+                      "summary", "lastInAt", "lastOutAt", "updatedAt", "error"}
+    assert s["funded"] is True and s["stage"] == "active" and s["owner"] == USER
+    assert s["summary"].startswith("Watching kaspa:")
+    bot.balance = 10
+    assert bot.status()["funded"] is False and bot.status()["summary"].startswith("Fund ")
+
+
+# ── mining ──────────────────────────────────────────────────────────────────
+
+def _entry(txid, amount, coinbase=True, index=0):
+    return {"address": WATCH, "txid": txid, "index": index, "amount": amount, "isCoinbase": coinbase,
+            "blockDaaScore": 1}
+
+
+def test_mining_rewards(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "1", "no"])
+    ctxf.hashrate = 2500.0
+    run(bot.on_utxos(WATCH, [_entry("a" * 64, 387_000_000)], []))
+    msg = texts(ctxf)[-1]
+    assert "Block reward: 3.87 KAS" in msg and "Balance: 50 KAS" in msg and "2.50 TH/s" in msg
+    run(bot.on_utxos(WATCH, [_entry("a" * 64, 387_000_000)], []))      # same outpoint again
+    run(bot.on_utxos(WATCH, [_entry("b" * 64, 50_000_000)], []))       # under minRewardKas
+    run(bot.on_utxos(WATCH, [_entry("c" * 64, 900_000_000, coinbase=False)], []))  # not a reward
+    assert len(ctxf.sent) == 1
+    bot.data["stage"] = "paused"
+    run(bot.on_utxos(WATCH, [_entry("d" * 64, 387_000_000)], []))
+    assert len(ctxf.sent) == 1
+
+
+def test_mining_hashrate_drop(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "40"])
+    t = ctxf.clock.t
+    for i in range(10):
+        run(bot.check_hashrate(t + i * 60, 1000.0, 40))
+    run(bot.check_hashrate(t + 660, 500.0, 40))
+    assert ctxf.sent == []                                 # one low reading is a blip
+    run(bot.check_hashrate(t + 720, 500.0, 40))
+    assert "Hashrate dropped 50%" in texts(ctxf)[-1]
+    run(bot.check_hashrate(t + 780, 400.0, 40))
+    assert len(ctxf.sent) == 1
+    run(bot.check_hashrate(t + 840, 950.0, 40))
+    assert "back" in texts(ctxf)[-1] and len(ctxf.sent) == 2
+
+
+# ── price ───────────────────────────────────────────────────────────────────
+
+def test_price_setup_and_crossings(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["0.05", "$0.03", "9am", "10%"])
+    assert bot.settings == {"above": 0.05, "below": 0.03, "dailyAt": "09:00", "movePct": 10.0, "currency": "usd"}
+    t = ctxf.clock.t
+    run(bot.observe(t, 0.040))
+    run(bot.observe(t + 60, 0.051))
+    assert "above $0.0500" in texts(ctxf)[-1]
+    run(bot.observe(t + 120, 0.052))
+    run(bot.observe(t + 180, 0.0499))                 # back by less than 1%: not re-armed
+    run(bot.observe(t + 240, 0.0501))
+    assert len(ctxf.sent) == 1
+    run(bot.observe(t + 300, 0.049))                  # 2% back: re-armed
+    run(bot.observe(t + 360, 0.0505))
+    assert len(ctxf.sent) == 2
+    run(bot.observe(t + 420, 0.029))
+    assert "below $0.0300" in texts(ctxf)[-1]
+
+
+def test_price_starting_above_does_not_alert(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["0.05", "no", "no", "no"])
+    run(bot.observe(ctxf.clock.t, 0.06))
+    run(bot.observe(ctxf.clock.t + 60, 0.061))
+    assert ctxf.sent == []
+
+
+def test_price_move_uses_api_change_until_history(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "10"])
+    run(bot.observe(ctxf.clock.t, 0.05, 12.5))
+    assert "up 12.5% in 24h" in texts(ctxf)[-1]
+    run(bot.observe(ctxf.clock.t + 60, 0.05, 13.0))
+    assert len(ctxf.sent) == 1
+    run(bot.observe(ctxf.clock.t + 120, 0.05, 2.0))      # calmed down: re-armed
+    run(bot.observe(ctxf.clock.t + 180, 0.05, 11.0))
+    assert len(ctxf.sent) == 2
+
+
+def test_price_move_from_own_samples(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "10"])
+    t = ctxf.clock.t
+    for i in range(0, 24 * 12 + 1):
+        run(bot.observe(t + i * 300, 0.040, None))
+    assert ctxf.sent == []
+    run(bot.observe(t + 24 * 3600 + 400, 0.035, None))
+    assert "down 12.5% in 24h" in texts(ctxf)[-1]
+
+
+def test_price_daily_summary_once(make_bot, ctxf):
+    import time as _t
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "09:00", "no"])
+    lt = _t.localtime(ctxf.clock.t)
+    nine = _t.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 9, 0, 0, 0, 0, -1))
+    run(bot.observe(nine - 60, 0.04))
+    assert ctxf.sent == []
+    run(bot.observe(nine + 30, 0.041))
+    assert texts(ctxf)[-1].startswith("KAS today: $0.0410")
+    run(bot.observe(nine + 90, 0.041))
+    assert len(ctxf.sent) == 1
+
+
+def test_price_tick_polls_once_a_minute(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["0.05", "no", "no", "no"])
+    ctxf.price = (0.04, None)
+    run(bot.tick(1000.0))
+    ctxf.price = (0.06, None)
+    run(bot.tick(1030.0))
+    assert bot.price == 0.04
+    run(bot.tick(1061.0))
+    assert bot.price == 0.06 and "above" in texts(ctxf)[-1]
+
+
+# ── wallet ──────────────────────────────────────────────────────────────────
+
+def _w(txid, amount, index=0, address=WATCH):
+    return {"address": address, "txid": txid, "index": index, "amount": amount, "isCoinbase": False,
+            "blockDaaScore": 1}
+
+
+def test_wallet_setup_validates_addresses(make_bot, ctxf):
+    bot = make_bot("wallet")
+    say(bot, "482915")
+    say(bot, f"{WATCH}, kaspa:qqbroken")
+    assert "doesn't look right" in texts(ctxf)[-1]
+    say(bot, f"{WATCH}, {WATCH2} {WATCH}")
+    say(bot, "5")
+    assert bot.settings == {"addresses": [WATCH, WATCH2], "minKas": 5.0}
+    assert bot.watched_addresses() == {WATCH, WATCH2}
+
+
+def test_wallet_received_and_sent(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "wallet", [WATCH, "1"])
+    t = ctxf.clock.t
+    ctxf.clock.t = t
+    run(bot.on_utxos(WATCH, [_w("a" * 64, 1_250_000_000)], []))
+    run(bot.tick(t + 1))
+    assert ctxf.sent == []                          # settling
+    run(bot.tick(t + 5))
+    assert texts(ctxf)[-1].startswith("Received 12.5 KAS on kaspa:") and "a" * 64 in texts(ctxf)[-1]
+    # a send with change: spends a's coin, change comes back in tx b
+    ctxf.clock.t = t + 10
+    run(bot.on_utxos(WATCH, [_w("b" * 64, 250_000_000, 1)], [_w("a" * 64, 1_250_000_000)]))
+    run(bot.tick(t + 20))
+    assert texts(ctxf)[-1].startswith("Sent 10 KAS from") and "b" * 64 in texts(ctxf)[-1]
+    # a sweep (no change): spender comes from the chain follower
+    ctxf.spenders[f"{'b' * 64}:1"] = "c" * 64
+    ctxf.clock.t = t + 30
+    run(bot.on_utxos(WATCH, [], [_w("b" * 64, 250_000_000, 1)]))
+    run(bot.tick(t + 40))
+    assert texts(ctxf)[-1].startswith("Sent 2.5 KAS") and "c" * 64 in texts(ctxf)[-1]
+    # below minKas
+    ctxf.clock.t = t + 50
+    run(bot.on_utxos(WATCH, [_w("d" * 64, 50_000_000)], []))
+    run(bot.tick(t + 60))
+    assert len(ctxf.sent) == 3
+
+
+def test_mining_without_bridge_skips_hashrate_question(ctxf):
+    from kachat.bots import make_bot as mk
+    ctx = ctxf.make()
+    ctx.fetch_hashrate = None
+    bot = mk(make_cfg("mining"), FakeStore(), ctx)
+    say(bot, "482915")
+    assert "1/2" in texts(ctxf)[-1]
+    say(bot, WATCH)
+    say(bot, "0")
+    assert bot.stage == "active" and bot.settings["hashrateDropPct"] is None

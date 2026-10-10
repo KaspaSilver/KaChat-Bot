@@ -1,11 +1,16 @@
+# Running without the Kaspa Quick Start panel. Put your bots in ./conf/bots.json
+# (see README.md); status and history appear in ./state/.
 services:
-  block-notifier:
+  kachat-bot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: kaspa-block-notifier
+    container_name: kachat-bot
     restart: always
     env_file:
       - .env
+    volumes:
+      - ./conf:/conf:ro
+      - ./state:/state
     extra_hosts:
       - "host-gateway:host-gateway"
