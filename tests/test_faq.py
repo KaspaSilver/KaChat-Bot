@@ -99,12 +99,10 @@ def test_owner_asks_too_and_sees_missed_questions(make_bot, ctxf):
     assert "topics" in texts(ctxf)[-1]
 
 
-def test_strangers_hitting_the_hourly_limit_tell_the_owner(make_bot, ctxf):
+def test_no_hourly_limit_for_many_people(make_bot, ctxf):
     bot = paired(make_bot, ctxf, "faq", ["skip"], max_out=5)
-    ctxf.clock.t += 3601
-    for i in range(7):
+    for i in range(20):
         say(bot, "what is kaspa", addr(f"{70 + i:02x}" * 32))
-    asks = [t for t in texts(ctxf) if "reached my limit" in t]
-    assert len(asks) == 1
-    say(bot, "yes")
-    assert texts(ctxf)[-1] == "Limit reset. I'll keep sending."
+    assert len(ctxf.sent) == 20
+    assert not any("reached my limit" in t for t in texts(ctxf))
+    assert bot.status()["error"] is None

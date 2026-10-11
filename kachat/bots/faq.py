@@ -5,8 +5,8 @@ KaChat can message it. The answers live in kachat/faq/kaspa.md (one topic per `#
 question gets the topic whose keys it contains most of. Nothing is generated.
 
 Spending: every reply is a transaction, so each person gets at most `perPersonPerDay`
-answers a day (then one "that's all for today" note), on top of the hourly limit every bot
-has. The owner talks to it like any bot (commands) and can ask questions too, without a cap.
+answers a day (then one "that's all for today" note). Unlike the other bots it has no hourly
+limit: anyone may ask, so its wallet is the only cap on how many people it answers. The owner talks to it like any bot (commands) and can ask questions too, without a cap.
 """
 from __future__ import annotations
 
@@ -75,6 +75,7 @@ class FaqBot(Bot):
     TYPE = "faq"
     TITLE = "Kaspa answers bot"
     PUBLIC = True
+    HOURLY_LIMIT = False          # anyone may ask; the per-person daily cap is the limit
 
     def __init__(self, *a, **kw):
         self.topics = load_topics()

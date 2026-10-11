@@ -61,7 +61,8 @@ settings and conversation and waits for the pairing code again.
 Once its owner has set it up, anyone in KaChat can message it. A question gets the topic in
 [kachat/faq/kaspa.md](kachat/faq/kaspa.md) whose keys it contains most of, word for word; `topics` (or `hi`)
 lists them and a number picks one. Nothing is generated. Each person gets the daily number of answers you set,
-then one "that's all for today" note. The owner can ask too (no cap), and `missed` shows recent questions it
+then one "that's all for today" note. It has no hourly limit (anyone may ask), so its wallet
+balance is the only cap on how many people it answers: fund it with that in mind. The owner can ask too (no cap), and `missed` shows recent questions it
 had no answer for, so you know what to add. Edit the file and rebuild to change the answers.
 
 Addresses are checked (right network, valid checksum) before they are accepted.
@@ -70,8 +71,9 @@ Addresses are checked (right network, valid checksum) before they are accepted.
 
 - Only the owner can make a bot spend. Before pairing, a stranger gets at most one "This bot is private."
   a day; after pairing, everyone else is ignored. The one exception is the Kaspa answers bot, which answers
-  anyone while it is active, capped per person per day and by the hourly limit.
-- A bot sends at most 50 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet. A reset from the
+  anyone while it is active, capped per person per day (it has no hourly limit).
+- A bot sends at most 50 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet (all but the
+  Kaspa answers bot, which caps each person per day instead). A reset from the
   panel starts that hour over, so its greeting always goes out.
   When a bot reaches the limit it tells its owner once and asks whether to reset it: `yes` starts the
   hour over and it keeps sending, `no` waits until the hour has passed.

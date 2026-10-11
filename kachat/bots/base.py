@@ -257,6 +257,9 @@ class Bot:
 
     # A public bot also answers people other than its owner (public_message).
     PUBLIC = False
+    # The hourly message limit (max_out_per_hour). The Kaspa answers bot turns it off: anyone may
+    # ask it, and it caps each person per day instead.
+    HOURLY_LIMIT = True
 
     async def public_message(self, sender: str, text: str, now: float) -> None:
         pass
@@ -326,7 +329,7 @@ class Bot:
         if not self.enabled:
             return None
         now = self.ctx.clock()
-        if not force and self._out_budget_left(now) <= 0:
+        if not force and self.HOURLY_LIMIT and self._out_budget_left(now) <= 0:
             self.error = f"Rate limit: {self.ctx.max_out_per_hour} messages in the last hour; holding back"
             log.warning("[%s] %s", self.id, self.error)
             self.save()
