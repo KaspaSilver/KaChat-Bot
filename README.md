@@ -48,8 +48,10 @@ settings and conversation and waits for the pairing code again.
 
 - **Mining**: the mining address to watch; the smallest reward to report (KAS, 0 = every block); alert on a
   hashrate drop of how many % (or `no`; needs the stratum bridge).
-- **Price** (USD): alert above which price; alert below which price; daily summary time (e.g. `09:00`, container
-  time zone); alert on a move of how many % within 24 h. Answer `no` to any of them.
+- **Price** (USD): alert above which price; alert below which price; daily summary time (`9 AM`, `8:30 PM`,
+  `noon`, or 24-hour `21:30`) and then your time zone (a city like `New York` or `London`, an abbreviation like
+  `EST`, or `UTC`; only asked when you want the summary); alert on a move of how many % within 24 h. Answer `no` to
+  any of them.
 - **Wallet**: one or more addresses (separated by spaces, up to 10); a nickname for each, or none; the smallest amount to report.
 
 Addresses are checked (right network, valid checksum) before they are accepted.

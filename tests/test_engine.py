@@ -258,8 +258,9 @@ def test_mining_hashrate_drop(make_bot, ctxf):
 # ── price ───────────────────────────────────────────────────────────────────
 
 def test_price_setup_and_crossings(make_bot, ctxf):
-    bot = paired(make_bot, ctxf, "price", ["0.05", "$0.03", "9am", "10%"])
-    assert bot.settings == {"above": 0.05, "below": 0.03, "dailyAt": "09:00", "movePct": 10.0, "currency": "usd"}
+    bot = paired(make_bot, ctxf, "price", ["0.05", "$0.03", "9am", "New York", "10%"])
+    assert bot.settings == {"above": 0.05, "below": 0.03, "dailyAt": "09:00", "timezone": "America/New_York",
+                            "movePct": 10.0, "currency": "usd"}
     t = ctxf.clock.t
     run(bot.observe(t, 0.040))
     run(bot.observe(t + 60, 0.051))
@@ -304,10 +305,11 @@ def test_price_move_from_own_samples(make_bot, ctxf):
 
 
 def test_price_daily_summary_once(make_bot, ctxf):
+    import calendar
     import time as _t
-    bot = paired(make_bot, ctxf, "price", ["no", "no", "09:00", "no"])
-    lt = _t.localtime(ctxf.clock.t)
-    nine = _t.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 9, 0, 0, 0, 0, -1))
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "09:00", "UTC", "no"])
+    lt = _t.gmtime(ctxf.clock.t)
+    nine = calendar.timegm((lt.tm_year, lt.tm_mon, lt.tm_mday, 9, 0, 0, 0, 0, 0))
     run(bot.observe(nine - 60, 0.04))
     assert ctxf.sent == []
     run(bot.observe(nine + 30, 0.041))
@@ -498,3 +500,55 @@ def test_panel_reset_before_pairing_just_records_it(make_bot, ctxf):
     bot.apply_config(make_cfg("wallet", reset_settings="n1"))
     run(bot.send_pending_greeting())
     assert ctxf.sent == [] and bot.stage == "awaiting_pairing"
+
+
+# ── price: daily summary in AM/PM and the owner's time zone ────────────────
+
+def test_parse_time_am_pm():
+    from kachat.bots.price import fmt_time, parse_time
+    cases = {"9am": "09:00", "9 AM": "09:00", "9:30 p.m.": "21:30", "12 am": "00:00", "12pm": "12:00",
+             "noon": "12:00", "midnight": "00:00", "21:15": "21:15", "8:05 PM": "20:05", "no": None}
+    for text, want in cases.items():
+        assert parse_time(text) == want, text
+    for bad in ("13pm", "0am", "25:00", "9:75", "soon"):
+        try:
+            parse_time(bad)
+        except Exception:
+            continue
+        raise AssertionError(bad)
+    assert fmt_time("21:30") == "9:30 PM" and fmt_time("00:05") == "12:05 AM" and fmt_time("12:00") == "12:00 PM"
+
+
+def test_parse_timezone():
+    from kachat.bots.price import parse_timezone
+    assert parse_timezone("EST") == "America/New_York"
+    assert parse_timezone("new york") == "America/New_York"
+    assert parse_timezone("London") == "Europe/London"
+    assert parse_timezone("europe/paris") == "Europe/Paris"
+    assert parse_timezone("utc") == "UTC"
+    try:
+        parse_timezone("Atlantis")
+    except Exception:
+        return
+    raise AssertionError("Atlantis")
+
+
+def test_timezone_only_asked_with_a_daily_summary(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "no"])
+    assert bot.stage == "active" and bot.settings["timezone"] is None
+    assert not any("time zone" in t for t in texts(ctxf))
+
+
+def test_daily_summary_fires_at_the_owners_local_time(make_bot, ctxf):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "9:00 AM", "New York", "no"])
+    assert "9:00 AM (America/New_York)" in bot.describe_settings()
+    ny = ZoneInfo("America/New_York")
+    nine = datetime(2026, 10, 12, 9, 0, 30, tzinfo=ny).timestamp()     # 13:00 UTC
+    run(bot.observe(nine - 3600, 0.04))                                 # 8 AM New York: nothing yet
+    assert not any(t.startswith("KAS today") for t in texts(ctxf))
+    run(bot.observe(nine, 0.041))
+    assert texts(ctxf)[-1].startswith("KAS today")
+    run(bot.observe(nine + 60, 0.041))                                  # once a day
+    assert sum(t.startswith("KAS today") for t in texts(ctxf)) == 1

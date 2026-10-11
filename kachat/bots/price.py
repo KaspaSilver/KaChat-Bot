@@ -2,7 +2,7 @@
 
 - crossing `above` / `below`: once per crossing, re-armed after the price moves
   back by 1% (so a price hovering at the line does not spam)
-- a daily summary at `dailyAt` (HH:MM, container time zone)
+- a daily summary at `dailyAt` (HH:MM, asked as 9 AM / 8:30 PM) in the owner's `timezone`
 - a move of at least `movePct` within 24 h (own samples; the API's 24 h change
   until the bot has a day of history), once per direction until it calms down
 
@@ -11,10 +11,11 @@ The price is polled every 60 s (api.kaspa.org, CoinGecko as fallback).
 from __future__ import annotations
 
 import re
-import time
+from datetime import datetime
 from typing import List, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
-from .base import AnswerError, Bot, Question, day_key, parse_number
+from .base import AnswerError, Bot, Question, parse_number
 
 POLL = 60.0
 SAMPLE_EVERY = 300.0          # persisted samples, 5 min apart, 25 h kept
@@ -32,21 +33,75 @@ def fmt_price(p: Optional[float], currency: str = "usd") -> str:
     return f"{sym}{s}" if sym else f"{s} {currency.upper()}"
 
 
+TIME_HELP = "I need a time like 9 AM or 8:30 PM (or no)."
+
+
 def parse_time(t: str) -> Optional[str]:
-    t = t.strip().lower()
+    """9 AM, 9am, 9:30 p.m., 21:30, noon, midnight -> "HH:MM" (24 h, stored)."""
+    t = t.strip().lower().replace(".", "")
     if t in ("no", "none", "off", "n", "never"):
         return None
-    m = re.match(r"^(\d{1,2})(?::|\.|h)?(\d{2})?\s*(am|pm)?$", t)
+    if t in ("noon", "midday", "12 noon"):
+        return "12:00"
+    if t == "midnight":
+        return "00:00"
+    m = re.match(r"^(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm|a|p)?$", t)
     if not m:
-        raise AnswerError("I need a time like 09:00 (or no).")
-    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), m.group(3)
-    if ap == "pm" and h < 12:
-        h += 12
-    if ap == "am" and h == 12:
-        h = 0
+        raise AnswerError(TIME_HELP)
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "")[:1]
+    if ap:
+        if not 1 <= h <= 12:
+            raise AnswerError(TIME_HELP)
+        h = (0 if h == 12 else h) + (12 if ap == "p" else 0)
     if h > 23 or mi > 59:
-        raise AnswerError("I need a time like 09:00 (or no).")
+        raise AnswerError(TIME_HELP)
     return f"{h:02d}:{mi:02d}"
+
+
+def fmt_time(hhmm: Optional[str]) -> str:
+    """ "21:30" -> "9:30 PM". """
+    if not hhmm:
+        return "no"
+    h, m = (int(x) for x in hhmm.split(":"))
+    return f"{(h % 12) or 12}:{m:02d} {'AM' if h < 12 else 'PM'}"
+
+
+# Common abbreviations people type for a time zone, to IANA names (daylight saving included).
+TZ_ALIASES = {
+    "utc": "UTC", "gmt": "UTC", "z": "UTC",
+    "et": "America/New_York", "est": "America/New_York", "edt": "America/New_York", "eastern": "America/New_York",
+    "ct": "America/Chicago", "cst": "America/Chicago", "cdt": "America/Chicago", "central": "America/Chicago",
+    "mt": "America/Denver", "mst": "America/Denver", "mdt": "America/Denver", "mountain": "America/Denver",
+    "pt": "America/Los_Angeles", "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles", "pacific": "America/Los_Angeles",
+    "akst": "America/Anchorage", "hst": "Pacific/Honolulu",
+    "bst": "Europe/London", "uk": "Europe/London", "cet": "Europe/Paris", "cest": "Europe/Paris",
+    "eet": "Europe/Athens", "ist": "Asia/Kolkata", "india": "Asia/Kolkata", "jst": "Asia/Tokyo",
+    "kst": "Asia/Seoul", "sgt": "Asia/Singapore", "hkt": "Asia/Hong_Kong",
+    "aest": "Australia/Sydney", "aedt": "Australia/Sydney", "nzst": "Pacific/Auckland",
+}
+
+
+def parse_timezone(t: str) -> str:
+    """A city ("New York", "london"), an IANA name ("Europe/Paris") or a common abbreviation."""
+    raw = (t or "").strip()
+    key = raw.lower().replace(" ", "_")
+    if key.replace("_", " ") in TZ_ALIASES or key in TZ_ALIASES:
+        return TZ_ALIASES.get(key) or TZ_ALIASES[key.replace("_", " ")]
+    zones = available_timezones()
+    for z in zones:                                   # exact IANA name, any case
+        if z.lower() == key:
+            return z
+    city = [z for z in zones if z.lower().rsplit("/", 1)[-1] == key and not z.lower().startswith(("etc/", "posix/", "right/"))]
+    if city:
+        return sorted(city, key=len)[0]
+    raise AnswerError("I don't know that time zone. Send a city (like New York, London, Tokyo), or UTC.")
+
+
+def zone(name: Optional[str]) -> ZoneInfo:
+    try:
+        return ZoneInfo(name or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
 
 
 class PriceBot(Bot):
@@ -60,7 +115,7 @@ class PriceBot(Bot):
         super().__init__(*a, **kw)
 
     def default_settings(self) -> dict:
-        return {"above": None, "below": None, "dailyAt": None, "movePct": None, "currency": "usd"}
+        return {"above": None, "below": None, "dailyAt": None, "timezone": None, "movePct": None, "currency": "usd"}
 
     @property
     def currency(self) -> str:
@@ -76,14 +131,29 @@ class PriceBot(Bot):
             return parse_number(t, minimum=1, maximum=100, allow_none=True, what="a percentage, like 10")
 
         show_p = lambda v: "no" if v is None else fmt_price(v, cur)  # noqa: E731
-        return [
+        qs = [
             Question("above", "Alert me when KAS goes above which price? (e.g. 0.05, or no)", money, None, show_p),
             Question("below", "Alert me when KAS falls below which price? (e.g. 0.03, or no)", money, None, show_p),
-            Question("dailyAt", "Daily price summary at what time? (e.g. 09:00, or no)", parse_time, None,
-                     show=lambda v: "no" if v is None else v),
+            Question("dailyAt", "Daily price summary at what time? (e.g. 9 AM or 8:30 PM, or no)", parse_time, None,
+                     show=fmt_time),
+        ]
+        # Only with a daily summary: whose 9 AM it is.
+        setup = self.data.get("setup") or {}
+        daily = (setup.get("draft") or {}).get("dailyAt", self.settings.get("dailyAt")) if setup else self.settings.get("dailyAt")
+        if daily:
+            qs.append(Question("timezone", "Which time zone are you in? (a city like New York, London or Tokyo, or UTC)",
+                               parse_timezone, self.settings.get("timezone") or "UTC", show=lambda v: v or "UTC"))
+        qs += [
             Question("movePct", "Alert me on a move of how many % within 24 h? (e.g. 10, or no)", pct, None,
                      show=lambda v: "no" if v is None else f"{v:g}%"),
         ]
+        return qs
+
+    def daily_label(self) -> str:
+        s = self.settings
+        if not s.get("dailyAt"):
+            return "off"
+        return f"{fmt_time(s['dailyAt'])} ({s.get('timezone') or 'UTC'})"
 
     def describe_settings(self) -> str:
         s, c = self.settings, self.currency
@@ -91,7 +161,7 @@ class PriceBot(Bot):
             return "off" if v is None else f(v)
         return (f"Above: {opt(s.get('above'), lambda v: fmt_price(v, c))}\n"
                 f"Below: {opt(s.get('below'), lambda v: fmt_price(v, c))}\n"
-                f"Daily summary: {opt(s.get('dailyAt'), str)}\n"
+                f"Daily summary: {self.daily_label()}\n"
                 f"24h move alert: {opt(s.get('movePct'), lambda v: f'{v:g}%')}")
 
     def summary(self) -> str:
@@ -207,10 +277,11 @@ class PriceBot(Bot):
 
         daily = s.get("dailyAt")
         if daily:
-            lt = time.localtime(now)
+            # In the owner's time zone (daylight saving included), not the container's.
+            local = datetime.fromtimestamp(now, zone(s.get("timezone")))
             h, m = (int(x) for x in daily.split(":"))
-            target = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
-            today = day_key(now)
+            target = local.replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+            today = local.strftime("%Y-%m-%d")
             if target <= now < target + DAILY_WINDOW and self.data.get("lastDaily") != today:
                 self.data["lastDaily"] = today
                 msgs.append(self.daily_text(now))
