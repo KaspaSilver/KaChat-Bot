@@ -4,6 +4,7 @@ KaChat Bot v2 daemon: hosts every bot listed in /conf/bots.json.
 
   python botd.py                         run the daemon (the container's CMD)
   python botd.py --send <botId> "<text>" deliver one message to that bot's owner
+  python botd.py --sweep <botId> <toAddress>  send ALL of that bot's funds to toAddress
 
 Environment (set by the Kaspa Quick Start panel):
   NODE_GRPC            kaspad gRPC, e.g. kaspad:16110
@@ -26,7 +27,7 @@ import os
 import signal
 import sys
 
-from kachat.daemon import Daemon, daemon_alive, outbox_send
+from kachat.daemon import Daemon, daemon_alive, outbox_send, outbox_sweep, sweep_bot, sweep_result
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -85,11 +86,49 @@ async def send_direct(cfg: dict, bot_id: str, text: str) -> dict:
         await backend.reset()
 
 
+async def sweep_direct(cfg: dict, bot_id: str, to: str) -> dict:
+    """--sweep when no daemon is running."""
+    from kachat.bots import BotContext, make_bot
+    from kachat.send import KaspaSdkBackend, MessageSender
+    from kachat.state import BotStore, parse_config, read_json
+
+    bots, _ = parse_config(read_json(cfg["conf_path"], {}) or {})
+    bc = next((b for b in bots if b.id == bot_id), None)
+    if bc is None:
+        return sweep_result(error=f"no bot {bot_id!r} in {cfg['conf_path']}")
+    backend = KaspaSdkBackend(cfg["wrpc_url"], cfg["network"])
+
+    async def no_send(*_):
+        raise RuntimeError("not sending messages during a sweep")
+
+    async def no_balance(_):
+        return None
+
+    bot = make_bot(bc, BotStore(cfg["state_dir"], bc.id),
+                   BotContext(network=cfg["network"], send=no_send, get_balance=no_balance))
+    try:
+        res = await sweep_bot(bot, MessageSender(bot.priv_hex, bot.address, backend), to, cfg["network"])
+        bot.store.write_status(bot.status())
+        return res
+    finally:
+        await backend.reset()
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="KaChat Bot v2 daemon")
     ap.add_argument("--send", nargs=2, metavar=("BOT_ID", "TEXT"), help="send one message to a bot's owner")
+    ap.add_argument("--sweep", nargs=2, metavar=("BOT_ID", "TO_ADDRESS"), help="send all of a bot's funds to an address")
     args = ap.parse_args(argv)
     cfg = env_config()
+
+    if args.sweep:
+        bot_id, to = args.sweep
+        if daemon_alive(cfg["state_dir"]):
+            res = outbox_sweep(cfg["state_dir"], bot_id, to)
+        else:
+            res = asyncio.run(sweep_direct(cfg, bot_id, to))
+        print(json.dumps(res))
+        return 0 if res.get("ok") else 1
 
     if args.send:
         bot_id, text = args.send

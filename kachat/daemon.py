@@ -16,7 +16,7 @@ import time
 import uuid
 from typing import Dict, Optional
 
-from .address import AddressError, prefix_for_network, validate_address
+from .address import AddressError, prefix_for_network, short_address, validate_address
 from .alias import watch_alias
 from .bots import Bot, BotContext, make_bot
 from .chain import ChainFollower, ChainTx, IndexerClient, is_chat_payload_hex
@@ -24,7 +24,7 @@ from .crypto import CryptoError, open_sealed
 from .feeds import fetch_bridge_hashrate, fetch_price
 from .node import GrpcNode, utxo_entry_dict
 from .payload import message_text, parse_payload
-from .send import KaspaSdkBackend, MessageSender
+from .send import InsufficientFunds, KaspaSdkBackend, MessageSender, SOMPI_PER_KAS
 from .state import BotStore, ConfigWatcher, atomic_write_json, read_json
 
 log = logging.getLogger("kachat.daemon")
@@ -432,6 +432,16 @@ class Daemon:
             if not isinstance(req, dict):
                 continue
             bot = self.bots.get(str(req.get("bot")))
+            if req.get("kind") == "sweep":
+                if time.time() - float(req.get("createdAt") or 0) > SWEEP_WAIT + 30:
+                    res = sweep_result(error="request expired")
+                elif bot is None:
+                    res = sweep_result(error="no such bot")
+                else:
+                    res = await sweep_bot(bot, self.senders[bot.id], str(req.get("to") or ""), self.network)
+                    self.dirty.add(bot.id)
+                atomic_write_json(result_path, res)
+                continue
             res = {"ok": False, "txid": None, "error": None}
             if time.time() - float(req.get("createdAt") or 0) > 120:
                 res["error"] = "request expired"          # its --send already gave up waiting
@@ -466,12 +476,63 @@ class Daemon:
                 pass
 
 
-def outbox_send(state_dir: str, bot_id: str, text: str, timeout: float = 90.0) -> dict:
-    """Hands a message to the running daemon and waits for the result."""
+SWEEP_WAIT = 120.0
+
+
+def sweep_result(ok=False, txids=(), amount=None, fee=None, error=None) -> dict:
+    """The one-line JSON `botd.py --sweep` prints."""
+    txids = list(txids)
+    return {"ok": bool(ok), "txid": txids[-1] if txids else None, "txids": txids,
+            "amountSompi": amount, "feeSompi": fee, "error": error}
+
+
+async def sweep_bot(bot: Bot, sender: MessageSender, to: str, network: str) -> dict:
+    """Sends all of `bot`'s spendable coins to `to` (the panel's payout address).
+    No owner needed and outside the hourly message limit; recorded in the history."""
+    try:
+        to = validate_address(to, network)
+    except AddressError as exc:
+        return sweep_result(error=f"invalid payout address: {exc}")
+    if to == bot.address:
+        return sweep_result(error="the payout address is the bot's own address")
+    try:
+        r = await sender.sweep(to)
+    except InsufficientFunds as exc:
+        return sweep_result(error=str(exc))
+    except Exception as exc:
+        log.warning("[%s] sweep failed: %s", bot.id, exc)
+        return sweep_result(error=f"sweep failed: {exc}")
+    if r.txids:
+        kas = f"{r.amount / SOMPI_PER_KAS:,.8f}".rstrip("0").rstrip(".")
+        text = f"Sent {kas} KAS to {short_address(to)} (all funds)"
+        if len(r.txids) > 1:
+            text += f" in {len(r.txids)} transactions"
+        bot.store.append_history("out", text, r.txids[-1], int(time.time()))
+        bot.data["lastOutAt"] = int(time.time())
+        try:
+            bot.balance = await sender.spendable()     # excludes the coins just swept
+        except Exception:
+            bot.balance = None
+        bot.save()
+    if r.leftover:   # coins too small to pay their own fee stay; not a failure
+        log.info("[%s] sweep left %d sompi in coins too small to pay their fee", bot.id, r.leftover)
+    return sweep_result(ok=bool(r.txids) and r.error is None, txids=r.txids,
+                        amount=r.amount if r.txids else None, fee=r.fee if r.txids else None, error=r.error)
+
+
+def outbox_sweep(state_dir: str, bot_id: str, to: str, timeout: float = SWEEP_WAIT) -> dict:
+    """Hands a sweep to the running daemon (which holds the wallet's send lock)."""
+    res = _outbox_request(state_dir, f"sweep-{bot_id}-", {"kind": "sweep", "bot": bot_id, "to": to}, timeout)
+    if res is None:
+        return sweep_result(error="the daemon did not answer in time")
+    return res
+
+
+def _outbox_request(state_dir: str, prefix: str, body: dict, timeout: float) -> Optional[dict]:
     outbox = os.path.join(state_dir, "botd", "outbox")
     os.makedirs(outbox, exist_ok=True)
-    rid = f"{int(time.time())}-{uuid.uuid4().hex[:8]}"
-    atomic_write_json(os.path.join(outbox, f"{rid}.req.json"), {"bot": bot_id, "text": text, "createdAt": int(time.time())})
+    rid = f"{prefix}{int(time.time())}-{uuid.uuid4().hex[:8]}"
+    atomic_write_json(os.path.join(outbox, f"{rid}.req.json"), dict(body, createdAt=int(time.time())))
     result_path = os.path.join(outbox, f"{rid}.result.json")
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -483,7 +544,13 @@ def outbox_send(state_dir: str, bot_id: str, text: str, timeout: float = 90.0) -
                 pass
             return res
         time.sleep(0.5)
-    return {"ok": False, "txid": None, "error": "the daemon did not answer in time"}
+    return None
+
+
+def outbox_send(state_dir: str, bot_id: str, text: str, timeout: float = 90.0) -> dict:
+    """Hands a message to the running daemon and waits for the result."""
+    res = _outbox_request(state_dir, "", {"bot": bot_id, "text": text}, timeout)
+    return res if res is not None else {"ok": False, "txid": None, "error": "the daemon did not answer in time"}
 
 
 def daemon_alive(state_dir: str, max_age: float = 30.0) -> bool:

@@ -122,6 +122,22 @@ python gen_wallet.py --network mainnet --from-key <64 hex>   # address of an exi
 `--send` hands the message to the running daemon (so its coins stay in order), or sends it directly when no
 daemon is running.
 
+### Emptying a bot wallet (`--sweep`)
+
+```
+python botd.py --sweep <botId> <toAddress>
+{"ok": true, "txid": "<last txid>", "txids": ["..."], "amountSompi": 986837597, "feeSompi": 162403, "error": null}
+```
+
+Sends **all** of the bot's spendable KAS to `toAddress` (the panel's "Send to wallet" button): every coin as
+an input, the payee as the only output, no change, no payload, the fee taken from the amount. A wallet with
+more than 80 coins is swept in several transactions of at most 80 inputs each, every one paying the payee
+directly. The address must be on the bot's network with a valid checksum and must not be the bot's own.
+No owner is needed and it does not count toward the hourly message limit; it shows up in the bot's history.
+Like `--send`, it goes through the running daemon (which pauses that wallet's messages meanwhile, up to
+120 s) or runs directly when no daemon is running. Exit code 1 on failure, with `error` saying why
+(e.g. "Nothing to send: the bot's wallet holds 0 KAS").
+
 ---
 
 ## Without the panel

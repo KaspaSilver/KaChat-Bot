@@ -134,6 +134,47 @@ def select_utxos(entries: List[dict], payload_len: int) -> Selection:
     raise InsufficientFunds("not enough KAS in the bot wallet for the network fee")
 
 
+@dataclass
+class SweepBatch:
+    entries: List[dict]
+    total: int
+    fee: int
+
+    @property
+    def output(self) -> int:
+        return self.total - self.fee
+
+
+def plan_sweep(entries: List[dict], to_address: str):
+    """Splits every spendable coin into batches of at most MAX_INPUTS inputs (one
+    transaction each, under the standard mass limit). Each batch pays its whole
+    value minus its own fee to `to_address` as the ONLY output: no change, no payload.
+
+    Returns (batches, leftover_sompi): coins that cannot pay their own fee stay behind."""
+    out_len = len(script_for_address(to_address))
+    coins = sorted((e for e in entries if not e["utxoEntry"].get("isCoinbase")), key=_amount, reverse=True)
+    batches: List[SweepBatch] = []
+    leftover = 0
+    for i in range(0, len(coins), MAX_INPUTS):
+        chunk = coins[i:i + MAX_INPUTS]
+        total = sum(_amount(e) for e in chunk)
+        fee = min_fee(len(chunk), 0, out_len)
+        if total > fee and fits_storage_mass([_amount(e) for e in chunk], [total - fee]):
+            batches.append(SweepBatch(chunk, total, fee))
+        else:
+            leftover += total
+    return batches, leftover
+
+
+@dataclass
+class SweepResult:
+    txids: List[str]
+    amount: int          # what the payee received
+    fee: int
+    leftover: int        # coins too small to pay their own fee
+    error: Optional[str] = None
+
+
 def build_payload(priv_hex: str, recipient: str, text: str, *, first_contact: bool = False) -> str:
     """The payload text for `text` sent from the bot (`priv_hex`) to `recipient`."""
     sealed = seal(clean_outgoing(text), xonly_from_address(recipient))
@@ -178,7 +219,8 @@ class KaspaSdkBackend:
 
     def build_and_sign(self, entries: List[dict], address: str, amount: int, payload: str, priv_hex: str, fee: int):
         from kaspa import Address, PaymentOutput, PrivateKey, create_transaction, sign_transaction
-        tx = create_transaction(entries, [PaymentOutput(Address(address), int(amount))], int(fee), payload.encode().hex(), 1)
+        payload_hex = payload.encode().hex() if payload else None
+        tx = create_transaction(entries, [PaymentOutput(Address(address), int(amount))], int(fee), payload_hex, 1)
         try:
             from kaspa import update_transaction_mass
             if not update_transaction_mass(self.network, tx):
@@ -221,6 +263,39 @@ class MessageSender:
             elif key not in self._spent:
                 out.append(self._pending)
         return out
+
+    async def sweep(self, to_address: str) -> SweepResult:
+        """Sends every spendable coin to `to_address`. Holds the send lock, so it never
+        races a message from the same wallet; afterwards the chained-coin cache is
+        dropped (the swept coins stay marked spent until the node confirms)."""
+        async with _loop_lock(self, "_send_lock"):
+            entries = self._merge(await self.backend.get_utxos(self.address))
+            spendable = sum(_amount(e) for e in entries if not e["utxoEntry"].get("isCoinbase"))
+            if spendable <= 0:
+                raise InsufficientFunds("Nothing to send: the bot's wallet holds 0 KAS")
+            batches, leftover = plan_sweep(entries, to_address)
+            if not batches:
+                raise InsufficientFunds(f"Nothing to send: the bot's wallet holds {spendable / SOMPI_PER_KAS:g} KAS, "
+                                        f"too little to pay the network fee")
+            res = SweepResult([], 0, 0, leftover)
+            now = self.clock()
+            try:
+                for b in batches:
+                    tx = self.backend.build_and_sign(b.entries, to_address, b.output, "", self.priv_hex, b.fee)
+                    try:
+                        txid = await self.backend.submit(tx)
+                    except Exception as exc:
+                        res.error = f"the node refused sweep transaction {len(res.txids) + 1} of {len(batches)}: {exc}"
+                        break
+                    res.txids.append(txid)
+                    res.amount += b.output
+                    res.fee += b.fee
+                    for e in b.entries:
+                        self._spent[_outpoint_key(e)] = now
+            finally:
+                self._pending = None
+            log.info("swept %d sompi to %s in %d tx(s)", res.amount, to_address, len(res.txids))
+            return res
 
     def _forget_chain(self):
         self._pending = None
