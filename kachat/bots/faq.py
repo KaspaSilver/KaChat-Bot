@@ -4,7 +4,7 @@ Unlike the other bots it is PUBLIC: once its owner has paired and set it up, any
 KaChat can message it. The answers live in kachat/faq/kaspa.md (one topic per `##`), and a
 question gets the topic whose keys it contains most of. Nothing is generated.
 
-Spending: every reply is a transaction, so each person gets at most `perPersonPerDay`
+Spending: every reply is a transaction, so each person gets at most `perPersonPerDay` (default 30)
 answers a day (then one "that's all for today" note). Unlike the other bots it has no hourly
 limit: anyone may ask, so its wallet is the only cap on how many people it answers. The owner talks to it like any bot (commands) and can ask questions too, without a cap.
 """
@@ -19,6 +19,7 @@ from .base import Bot, Question, day_key, parse_number
 
 FAQ_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faq", "kaspa.md")
 MISSED_MAX = 20
+DEFAULT_PER_PERSON = 30          # answers one person may get per day
 GREETINGS = ("hi", "hello", "hey", "gm", "yo", "start", "menu", "help", "topics", "topic", "list", "?")
 
 
@@ -85,20 +86,20 @@ class FaqBot(Bot):
         self.data.setdefault("missed", [])
 
     def default_settings(self) -> dict:
-        return {"perPersonPerDay": 10}
+        return {"perPersonPerDay": DEFAULT_PER_PERSON}
 
     def questions(self) -> List[Question]:
         def parse_cap(t: str) -> int:
             return int(parse_number(t, minimum=1, maximum=100, what="a number of answers"))
         return [Question("perPersonPerDay",
                          "How many answers may one person get per day? Every answer costs me a tiny fee.",
-                         parse_cap, default=10)]
+                         parse_cap, default=DEFAULT_PER_PERSON)]
 
     def describe_settings(self) -> str:
-        return f"Answers per person per day: {self.settings.get('perPersonPerDay', 10)}"
+        return f"Answers per person per day: {self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)}"
 
     def summary(self) -> str:
-        return f"Answering Kaspa questions for anyone ({self.settings.get('perPersonPerDay', 10)} a day each)"
+        return f"Answering Kaspa questions for anyone ({self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)} a day each)"
 
     def status_extra(self) -> str:
         counts = self._today()["counts"]
@@ -158,7 +159,7 @@ class FaqBot(Bot):
         counts = self._today()["counts"]
         n = counts.get(sender, 0) + 1
         counts[sender] = n
-        cap = int(self.settings.get("perPersonPerDay", 10))
+        cap = int(self.settings.get("perPersonPerDay", DEFAULT_PER_PERSON))
         if n <= cap:
             await self._reply(sender, text)
         elif n == cap + 1:

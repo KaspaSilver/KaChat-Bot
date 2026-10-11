@@ -54,7 +54,7 @@ settings and conversation and waits for the pairing code again.
   `EST`, or `UTC`; only asked when you want the summary); alert on a move of how many % within 24 h. Answer `no` to
   any of them.
 - **Wallet**: one or more addresses (separated by spaces, up to 10); a nickname for each, or none; the smallest amount to report.
-- **Kaspa answers**: how many answers one person may get per day (default 10).
+- **Kaspa answers**: how many answers one person may get per day (default 30).
 
 ### The Kaspa answers bot
 

@@ -106,3 +106,11 @@ def test_no_hourly_limit_for_many_people(make_bot, ctxf):
     assert len(ctxf.sent) == 20
     assert not any("reached my limit" in t for t in texts(ctxf))
     assert bot.status()["error"] is None
+
+
+def test_default_is_thirty_a_day(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "faq", ["skip"])
+    for _ in range(32):
+        say(bot, "what is kaspa", OTHER)
+    got = texts(ctxf, OTHER)
+    assert len(got) == 31 and got[-1].startswith("That's all my answers for you today (30)")
