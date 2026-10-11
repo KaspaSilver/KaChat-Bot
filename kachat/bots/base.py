@@ -11,7 +11,8 @@ Spending rules (every reply costs a network fee):
   - one reply per incoming owner message, at most `max_out_per_hour` messages per hour in total
   - before pairing, a stranger gets at most one "This bot is private." per day
     (and all strangers together at most PRIVATE_REPLIES_PER_DAY a day)
-  - after pairing, anyone but the owner is ignored: no reply, no spend
+  - after pairing, anyone but the owner is ignored: no reply, no spend, except on a PUBLIC
+    bot (the Kaspa answers bot), which answers anyone while active, a few times a day each
 """
 from __future__ import annotations
 
@@ -254,6 +255,16 @@ class Bot:
     def watched_addresses(self) -> set:
         return set()
 
+    # A public bot also answers people other than its owner (public_message).
+    PUBLIC = False
+
+    async def public_message(self, sender: str, text: str, now: float) -> None:
+        pass
+
+    async def on_free_text(self, text: str) -> None:
+        """The owner sent something that is not a command."""
+        await self.say("I didn't get that. Send help for the commands.")
+
     # Address-watching bots (mining, wallet) set ADDRESS_KEY and get the `add` command.
     ADDRESS_KEY: Optional[str] = None
     ASKS_NICKNAME = False
@@ -319,8 +330,7 @@ class Bot:
             self.error = f"Rate limit: {self.ctx.max_out_per_hour} messages in the last hour; holding back"
             log.warning("[%s] %s", self.id, self.error)
             self.save()
-            if recipient == self.owner:
-                await self._ask_about_limit()
+            await self._ask_about_limit()       # always the owner, whoever this was for
             return None
         if not force:
             self.data["outTimes"].append(now)
@@ -375,6 +385,8 @@ class Bot:
             self.save()
             return
         if sender != self.owner:
+            if self.PUBLIC and self.stage == "active" and sender != self.address:
+                await self.public_message(sender, text, now)
             self.save()               # remember the txid, nothing else
             return
         self.data["lastInAt"] = ts
@@ -524,7 +536,7 @@ class Bot:
             if in_setup:
                 await self._answer(text)
             else:
-                await self.say("I didn't get that. Send help for the commands.")
+                await self.on_free_text(text)
             return
         again = ("\n\n" + self._prompt(int(self.data["setup"]["step"]))) if in_setup else ""
         if cmd == "help":

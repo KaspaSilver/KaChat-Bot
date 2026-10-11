@@ -23,7 +23,7 @@ log = logging.getLogger("kachat.state")
 BOT_ID_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 KEY_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 CODE_RE = re.compile(r"^[0-9]{6}$")
-BOT_TYPES = ("mining", "price", "wallet")
+BOT_TYPES = ("mining", "price", "wallet", "faq")
 HISTORY_MAX = 500
 
 
