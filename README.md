@@ -54,24 +54,24 @@ settings and conversation and waits for the pairing code again.
   `EST`, or `UTC`; only asked when you want the summary); alert on a move of how many % within 24 h. Answer `no` to
   any of them.
 - **Wallet**: one or more addresses (separated by spaces, up to 10); a nickname for each, or none; the smallest amount to report.
-- **Kaspa answers**: how many answers one person may get per day (default 30).
+- **Kaspa answers**: none. It has no owner and no setup (see below).
 
 ### The Kaspa answers bot
 
-Once its owner has set it up, anyone in KaChat can message it. A question gets the topic in
+It is public: no pairing code, no owner, no setup chat. Set it up in the panel, fund it, and it is live;
+share its address and anyone in KaChat can message it. A question gets the topic in
 [kachat/faq/kaspa.md](kachat/faq/kaspa.md) whose keys it contains most of, word for word; `topics` (or `hi`)
-lists them and a number picks one. Nothing is generated. Each person gets the daily number of answers you set,
-then one "that's all for today" note. It has no hourly limit (anyone may ask), so its wallet
-balance is the only cap on how many people it answers: fund it with that in mind. The owner can ask too (no cap), and `missed` shows recent questions it
-had no answer for, so you know what to add. Edit the file and rebuild to change the answers.
-
-Addresses are checked (right network, valid checksum) before they are accepted.
+lists them and a number picks one. Nothing is generated. Each person gets 30 answers a day, then one "that's
+all for today" note. It has no hourly limit (anyone may ask), so its wallet balance is the only cap on how many
+people it answers: fund it with that in mind. Its panel square shows how many it has answered, how many people
+asked today, every conversation, and recent questions it had no answer for, so you know what to add. Edit the
+file and rebuild to change the answers. The on/off switch stops it; Reset starts its counts over.
 
 ### Safety
 
 - Only the owner can make a bot spend. Before pairing, a stranger gets at most one "This bot is private."
-  a day; after pairing, everyone else is ignored. The one exception is the Kaspa answers bot, which answers
-  anyone while it is active, capped per person per day (it has no hourly limit).
+  a day; after pairing, everyone else is ignored. The one exception is the Kaspa answers bot, which has no owner
+  and answers anyone while it is switched on, capped per person per day (it has no hourly limit).
 - A bot sends at most 50 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet (all but the
   Kaspa answers bot, which caps each person per day instead). A reset from the
   panel starts that hour over, so its greeting always goes out.

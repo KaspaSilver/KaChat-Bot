@@ -260,6 +260,9 @@ class Bot:
     # The hourly message limit (max_out_per_hour). The Kaspa answers bot turns it off: anyone may
     # ask it, and it caps each person per day instead.
     HOURLY_LIMIT = True
+    # False: nobody pairs with it and it has no owner (the Kaspa answers bot). It is live as soon
+    # as it runs, and its history logs every conversation, each line naming the other side.
+    PAIRS = True
 
     async def public_message(self, sender: str, text: str, now: float) -> None:
         pass
@@ -346,6 +349,8 @@ class Bot:
             return None
         if recipient == self.owner:
             self.store.append_history("out", text, txid, int(now))
+        elif not self.PAIRS:
+            self.store.append_history("out", f"To {short_address(recipient)}: {text}", txid, int(now))
         self.data["lastOutAt"] = int(now)
         if self.error and (self.error.startswith("Could not send") or (not force and self.error.startswith("Rate limit"))):
             self.error = None
@@ -380,6 +385,14 @@ class Bot:
         now = self.ctx.clock()
         ts = int(ts if ts is not None else now)
         sender = sender.strip().lower()
+        if not self.PAIRS:
+            # No owner, no pairing: everyone is just someone asking.
+            if self.stage == "active" and sender != self.address:
+                self.data["lastInAt"] = ts
+                self.store.append_history("in", f"{short_address(sender)}: {text}", txid, ts)
+                await self.public_message(sender, text, now)
+            self.save()
+            return
         if self.owner is None:
             if re.search(rf"(?<!\d){re.escape(self.cfg.pairing_code)}(?!\d)", text or ""):
                 await self._pair(sender, text, txid, ts)

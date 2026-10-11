@@ -1,12 +1,14 @@
 """Kaspa answers bot: fixed, hand-checked answers to common Kaspa questions, for anyone.
 
-Unlike the other bots it is PUBLIC: once its owner has paired and set it up, anyone in
-KaChat can message it. The answers live in kachat/faq/kaspa.md (one topic per `##`), and a
-question gets the topic whose keys it contains most of. Nothing is generated.
+Unlike the other bots it is PUBLIC and has no owner: no pairing code, no setup chat. It is
+live as soon as it runs (and is funded), and anyone in KaChat can message it. The answers live
+in kachat/faq/kaspa.md (one topic per `##`), and a question gets the topic whose keys it
+contains most of. Nothing is generated.
 
 Spending: every reply is a transaction, so each person gets at most `perPersonPerDay` (default 30)
-answers a day (then one "that's all for today" note). Unlike the other bots it has no hourly
-limit: anyone may ask, so its wallet is the only cap on how many people it answers. The owner talks to it like any bot (commands) and can ask questions too, without a cap.
+answers a day (then one "that's all for today" note). It has no hourly limit: anyone may ask, so
+its wallet is the only cap on how many people it answers. How it is doing, and the questions it
+had no answer for, show in its panel square (status "stats").
 """
 from __future__ import annotations
 
@@ -15,7 +17,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from .base import Bot, Question, day_key, parse_number
+from ..address import short_address
+from .base import Bot, Question, day_key
 
 FAQ_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faq", "kaspa.md")
 MISSED_MAX = 20
@@ -77,6 +80,7 @@ class FaqBot(Bot):
     TITLE = "Kaspa answers bot"
     PUBLIC = True
     HOURLY_LIMIT = False          # anyone may ask; the per-person daily cap is the limit
+    PAIRS = False                 # public: no owner, live from the start
 
     def __init__(self, *a, **kw):
         self.topics = load_topics()
@@ -84,16 +88,30 @@ class FaqBot(Bot):
         self.data.setdefault("askers", {"day": "", "counts": {}})
         self.data.setdefault("answered", 0)
         self.data.setdefault("missed", [])
+        self._go_live()
+
+    def _go_live(self) -> None:
+        self.data.update({"owner": None, "stage": "active", "setup": None, "greetPending": False,
+                          "settings": self.data.get("settings") or self.default_settings()})
+
+    def reset_owner(self) -> None:
+        super().reset_owner()
+        self._go_live()
+
+    def apply_config(self, cfg, initial: bool = False) -> None:
+        super().apply_config(cfg, initial)
+        # The panel's Reset: start the counts and the missed list over (there are no answers to forget).
+        rs = getattr(cfg, "reset_settings", None)
+        if rs and rs != self.data.get("faqResetSeen"):
+            self.data.update({"faqResetSeen": rs, "askers": {"day": "", "counts": {}}, "answered": 0, "missed": []})
+        self._go_live()
+        self.save()
 
     def default_settings(self) -> dict:
         return {"perPersonPerDay": DEFAULT_PER_PERSON}
 
     def questions(self) -> List[Question]:
-        def parse_cap(t: str) -> int:
-            return int(parse_number(t, minimum=1, maximum=100, what="a number of answers"))
-        return [Question("perPersonPerDay",
-                         "How many answers may one person get per day? Every answer costs me a tiny fee.",
-                         parse_cap, default=DEFAULT_PER_PERSON)]
+        return []
 
     def describe_settings(self) -> str:
         return f"Answers per person per day: {self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)}"
@@ -101,16 +119,21 @@ class FaqBot(Bot):
     def summary(self) -> str:
         return f"Answering Kaspa questions for anyone ({self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)} a day each)"
 
-    def status_extra(self) -> str:
-        counts = self._today()["counts"]
-        return f"Today: {len(counts)} people asked. Answers so far: {self.data.get('answered', 0)}."
+    def panel_summary(self) -> str:
+        if not self.enabled:
+            return "Disabled"
+        if self.balance is not None and not self.funded():
+            return f"Fund {short_address(self.address)} to start"
+        return self.summary()
 
-    def sample_notification(self) -> str:
-        return self.topics[0].answer if self.topics else "No answers loaded."
-
-    def help_text(self) -> str:
-        return (super().help_text() + "\ntopics - what I can answer\nmissed - recent questions I had no answer for"
-                "\nAnything else is taken as a Kaspa question.")
+    def status(self) -> dict:
+        st = super().status()
+        st["stats"] = {
+            "answered": int(self.data.get("answered", 0)),
+            "peopleToday": len(self._today()["counts"]),
+            "missed": list(self.data.get("missed", []))[-10:],
+        }
+        return st
 
     # ── answering ───────────────────────────────────────────────────────────
 
@@ -165,12 +188,3 @@ class FaqBot(Bot):
         elif n == cap + 1:
             await self.send_to(sender, f"That's all my answers for you today ({cap}). Ask me again tomorrow!")
         self.save()
-
-    async def on_free_text(self, text: str) -> None:
-        bare = (text or "").strip().lower().lstrip("/").rstrip(".!?")
-        if bare == "missed":
-            missed = self.data.get("missed", [])
-            await self.say("Recent questions I had no answer for:\n" + "\n".join(f"- {m}" for m in missed[-10:])
-                           if missed else "No unanswered questions yet.")
-            return
-        await self._reply(self.owner, text)
