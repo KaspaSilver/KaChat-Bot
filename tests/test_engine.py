@@ -110,6 +110,23 @@ def test_commands(make_bot, ctxf):
     assert bot.stage == "active" and bot.settings["minRewardKas"] == 2.0 and bot.settings["address"] == WATCH
 
 
+def test_reset_forgets_settings_and_asks_again(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "1.5", "no"])
+    say(bot, "reset")
+    assert bot.owner == USER                                  # still paired
+    assert bot.stage == "setup" and not bot.settings
+    last = texts(ctxf)[-1]
+    assert last.startswith("Reset:") and "1/3" in last and "now:" not in last  # the old answers are not offered
+    say(bot, "skip")                                          # the address is needed again
+    assert "needed" in texts(ctxf)[-1]
+    say(bot, WATCH)
+    say(bot, "skip")
+    say(bot, "skip")
+    assert bot.stage == "active" and bot.settings["address"] == WATCH and bot.settings["minRewardKas"] == 0
+    say(bot, "help")
+    assert "reset" in texts(ctxf)[-1]
+
+
 def test_commands_during_setup_reask(make_bot, ctxf):
     bot = make_bot("wallet")
     say(bot, "482915")

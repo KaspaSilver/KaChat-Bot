@@ -34,7 +34,7 @@ PRIVATE_REPLIES_PER_DAY = 20
 DEFAULT_MAX_OUT_PER_HOUR = 30
 REQUIRED = object()
 
-COMMANDS = ("help", "status", "settings", "change", "pause", "resume", "test")
+COMMANDS = ("help", "status", "settings", "change", "reset", "pause", "resume", "test")
 SKIP_WORDS = ("skip", "default", "keep", "-")
 
 
@@ -394,6 +394,7 @@ class Bot:
                 "status - what I'm doing\n"
                 "settings - my settings\n"
                 "change - answer the setup questions again\n"
+                "reset - forget my settings and start setup over\n"
                 "pause / resume - stop / restart notifications\n"
                 "test - send a sample notification\n"
                 "help - this list")
@@ -427,6 +428,15 @@ class Bot:
             self._start_setup(from_current=bool(self.data.get("settings")))
             self.save()
             await self.say("Let's update your settings.\n\n" + self._prompt(0))
+        elif cmd == "reset":
+            # Forget the settings (you stay paired) and ask everything again from the start,
+            # with the defaults rather than the old answers. Nothing is watched until set up.
+            self.data["settings"] = None
+            self.on_reset()
+            self.on_settings_changed()
+            self._start_setup(from_current=False)
+            self.save()
+            await self.say("Reset: I've forgotten your settings. Let's set me up again.\n\n" + self._prompt(0))
         elif in_setup:
             await self.say("Let's finish setup first." + again)
         elif cmd == "pause":

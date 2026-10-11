@@ -39,6 +39,7 @@ settings and conversation and waits for the pairing code again.
 | `status` | what the bot is doing, and its wallet balance |
 | `settings` | its current settings |
 | `change` | answer the setup questions again (`skip` keeps the current value) |
+| `reset` | forget the settings and start setup over from the defaults (you stay paired) |
 | `pause` / `resume` | stop / restart notifications |
 | `test` | send a sample notification |
 
