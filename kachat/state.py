@@ -67,6 +67,7 @@ class BotConfig:
     address: str
     pairing_code: str
     reset_owner: Optional[str]
+    reset_settings: Optional[str] = None
 
 
 def parse_config(obj) -> Tuple[List[BotConfig], List[str]]:
@@ -101,11 +102,13 @@ def parse_config(obj) -> Tuple[List[BotConfig], List[str]]:
             problems.append(f"{bid}: pairingCode must be 6 digits")
             continue
         reset = b.get("resetOwner")
+        reset_settings = b.get("resetSettings")
         seen.add(bid)
         bots.append(BotConfig(
             id=bid, type=btype, enabled=b.get("enabled", True) is not False,
             private_key_hex=key.lower(), address=str(b.get("address") or ""),
             pairing_code=code, reset_owner=str(reset) if reset not in (None, "") else None,
+            reset_settings=str(reset_settings) if reset_settings not in (None, "") else None,
         ))
     return bots, problems
 

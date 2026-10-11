@@ -95,7 +95,8 @@ Addresses are checked (right network, valid checksum) before they are accepted.
   "bots": [
     { "id": "mining-3f9a", "type": "mining", "enabled": true,
       "privateKeyHex": "<64 hex>", "address": "kaspa:q...", "pairingCode": "482915",
-      "resetOwner": "optional nonce; changing it resets the owner" }
+      "resetOwner": "optional nonce; changing it resets the owner",
+      "resetSettings": "optional nonce; changing it forgets the answers (owner, wallet and funds stay) and the bot greets its owner with the first setup message again" }
   ]
 }
 ```

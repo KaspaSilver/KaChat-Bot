@@ -469,3 +469,32 @@ def test_old_single_address_mining_settings_still_work(make_bot, ctxf):
     assert bot.watched_addresses() == {WATCH}
     say(bot, f"add {WATCH2}")
     assert bot.settings["addresses"] == [WATCH, WATCH2]
+
+
+# ── the panel's Reset: forget the answers, greet the owner again ────────────
+
+def test_panel_reset_keeps_owner_and_asks_again(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "1.5", "no"])
+    sent_before = len(ctxf.sent)
+    bot.apply_config(make_cfg("mining", reset_settings="n1"))
+    assert bot.owner == USER and not bot.settings and bot.stage == "setup"
+    assert bot.watched_addresses() == set()
+    run(bot.send_pending_greeting())
+    msg = texts(ctxf)[-1]
+    assert len(ctxf.sent) == sent_before + 1
+    assert msg.startswith("Hi again!") and "1/3" in msg and "mining address" in msg
+    run(bot.send_pending_greeting())                 # only once
+    assert len(ctxf.sent) == sent_before + 1
+    bot.apply_config(make_cfg("mining", reset_settings="n1"))   # same click again: nothing
+    assert bot.stage == "setup" and len(ctxf.sent) == sent_before + 1
+    say(bot, WATCH2)
+    say(bot, "skip")
+    say(bot, "skip")
+    assert bot.stage == "active" and bot.settings["addresses"] == [WATCH2]
+
+
+def test_panel_reset_before_pairing_just_records_it(make_bot, ctxf):
+    bot = make_bot("wallet")
+    bot.apply_config(make_cfg("wallet", reset_settings="n1"))
+    run(bot.send_pending_greeting())
+    assert ctxf.sent == [] and bot.stage == "awaiting_pairing"

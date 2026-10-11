@@ -19,6 +19,9 @@ def test_parse_config_accepts_contract_example():
     assert problems == []
     b = bots[0]
     assert (b.id, b.type, b.enabled, b.pairing_code, b.reset_owner) == ("mining-3f9a", "mining", True, "482915", "abc")
+    assert b.reset_settings is None
+    bots, _ = parse_config(conf(resetSettings="s1"))
+    assert bots[0].reset_settings == "s1"
 
 
 def test_parse_config_rejects_bad_entries():

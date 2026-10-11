@@ -166,7 +166,37 @@ class Bot:
             if had_owner:
                 log.info("[%s] resetOwner changed: forgetting owner, settings and conversation", cfg.id)
             self.reset_owner()
+        # The panel's Reset: forget only the answers (wallet, owner and funds stay) and greet the
+        # owner with the first setup message again, as on pairing. The message itself is sent from
+        # tick (this runs synchronously on a config reload).
+        rs = getattr(cfg, "reset_settings", None)
+        # A click made while the bot was stopped still applies at its next start.
+        if rs and rs != self.data.get("resetSettingsSeen"):
+            self.data["resetSettingsSeen"] = rs
+            if self.data.get("owner"):
+                log.info("[%s] resetSettings changed: forgetting the answers, setup starts over", cfg.id)
+                self.data["settings"] = None
+                self.data["adding"] = None
+                self.on_reset()
+                self.on_settings_changed()
+                self._start_setup(from_current=False)
+                self.data["greetPending"] = True
         self.save()
+
+    async def send_pending_greeting(self) -> None:
+        """After a panel Reset: the first setup message again, to the owner."""
+        if not self.data.get("greetPending") or not self.data.get("owner"):
+            return
+        self.data["greetPending"] = False
+        self.save()
+        q = self.questions()
+        intro = f"Hi again! I'm your KaChat {self.TITLE}, and my settings were just reset. "
+        if q:
+            await self.say(intro + "A few quick questions.\n\n" + self._prompt(0))
+        else:
+            self._finish_setup()
+            self.save()
+            await self.say(intro + "All set.")
 
     def reset_owner(self) -> None:
         self.data.update({"owner": None, "settings": None, "stage": "awaiting_pairing",

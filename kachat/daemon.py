@@ -335,6 +335,7 @@ class Daemon:
                 if not bot.enabled:
                     continue
                 try:
+                    await bot.send_pending_greeting()
                     await bot.tick(now)
                 except Exception:
                     log.exception("[%s] tick failed", bot.id)

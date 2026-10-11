@@ -109,10 +109,10 @@ class FakeCtxFactory:
                           spender_of=lambda k: self.spenders.get(k), max_out_per_hour=max_out)
 
 
-def make_cfg(bot_type="mining", key=BOT_KEY, code="482915", enabled=True, reset=None, bid=None):
+def make_cfg(bot_type="mining", key=BOT_KEY, code="482915", enabled=True, reset=None, bid=None, reset_settings=None):
     from kachat.state import BotConfig
     return BotConfig(id=bid or f"{bot_type}-1", type=bot_type, enabled=enabled, private_key_hex=key,
-                     address=addr(key), pairing_code=code, reset_owner=reset)
+                     address=addr(key), pairing_code=code, reset_owner=reset, reset_settings=reset_settings)
 
 
 @pytest.fixture
