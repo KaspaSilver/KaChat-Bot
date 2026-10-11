@@ -552,3 +552,41 @@ def test_daily_summary_fires_at_the_owners_local_time(make_bot, ctxf):
     assert texts(ctxf)[-1].startswith("KAS today")
     run(bot.observe(nine + 60, 0.041))                                  # once a day
     assert sum(t.startswith("KAS today") for t in texts(ctxf)) == 1
+
+
+def test_panel_reset_lifts_the_rate_limit_and_the_greeting_goes_out(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], max_out=5)
+    for _ in range(6):
+        say(bot, "status")                                   # use up the hour
+    assert bot.status()["error"].startswith("Rate limit")
+    sent = len(ctxf.sent)
+    bot.apply_config(make_cfg("mining", reset_settings="r1"))
+    assert bot.status()["error"] is None
+    run(bot.send_pending_greeting())
+    assert len(ctxf.sent) == sent + 1 and texts(ctxf)[-1].startswith("Hi again!")
+
+
+def test_greeting_is_kept_until_it_is_sent(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    ctxf.clock.t += 3601
+    bot.apply_config(make_cfg("mining", reset_settings="r2"))
+    ctxf.fail = True                                         # node refuses the send
+    run(bot.send_pending_greeting())
+    assert bot.data.get("greetPending") is True
+    ctxf.fail = False
+    run(bot.send_pending_greeting())
+    assert not bot.data.get("greetPending") and texts(ctxf)[-1].startswith("Hi again!")
+
+
+def test_rate_limit_warning_clears_when_the_hour_passes(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], max_out=5)
+    for _ in range(6):
+        say(bot, "status")
+    assert bot.status()["error"].startswith("Rate limit")
+    ctxf.clock.t += 3601
+    assert bot.status()["error"] is None
+
+
+def test_default_limit_is_fifty():
+    from kachat.bots.base import DEFAULT_MAX_OUT_PER_HOUR
+    assert DEFAULT_MAX_OUT_PER_HOUR == 50

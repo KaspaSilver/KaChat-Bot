@@ -31,7 +31,7 @@ log = logging.getLogger("kachat.bot")
 SEEN_MAX = 3000
 PRIVATE_REPLY = "This bot is private."
 PRIVATE_REPLIES_PER_DAY = 20
-DEFAULT_MAX_OUT_PER_HOUR = 30
+DEFAULT_MAX_OUT_PER_HOUR = 50
 REQUIRED = object()
 
 COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
@@ -181,26 +181,35 @@ class Bot:
                 self.on_settings_changed()
                 self._start_setup(from_current=False)
                 self.data["greetPending"] = True
+            # A reset starts the hourly message budget over, so its greeting always goes out.
+            self._clear_rate_limit()
         self.save()
 
     async def send_pending_greeting(self) -> None:
         """After a panel Reset: the first setup message again, to the owner."""
         if not self.data.get("greetPending") or not self.data.get("owner"):
             return
-        self.data["greetPending"] = False
-        self.save()
         q = self.questions()
         intro = f"Hi again! I'm your KaChat {self.TITLE}, and my settings were just reset. "
         if q:
-            await self.say(intro + "A few quick questions.\n\n" + self._prompt(0))
+            txid = await self.say(intro + "A few quick questions.\n\n" + self._prompt(0))
         else:
             self._finish_setup()
-            self.save()
-            await self.say(intro + "All set.")
+            txid = await self.say(intro + "All set.")
+        # Kept until it really went out (wallet empty, node down, ...): tried again next tick.
+        if txid:
+            self.data["greetPending"] = False
+        self.save()
+
+    def _clear_rate_limit(self) -> None:
+        self.data["outTimes"] = []
+        if self.error and self.error.startswith("Rate limit"):
+            self.error = None
 
     def reset_owner(self) -> None:
         self.data.update({"owner": None, "settings": None, "stage": "awaiting_pairing",
                           "setup": None, "privateReplies": {}})
+        self._clear_rate_limit()
         self.on_reset()
         try:
             import os
@@ -260,7 +269,11 @@ class Bot:
     def _out_budget_left(self, now: float) -> int:
         times = [t for t in self.data.get("outTimes", []) if now - t < 3600]
         self.data["outTimes"] = times
-        return self.ctx.max_out_per_hour - len(times)
+        left = self.ctx.max_out_per_hour - len(times)
+        # The hour has moved on: the warning is not true any more.
+        if left > 0 and self.error and self.error.startswith("Rate limit"):
+            self.error = None
+        return left
 
     async def send_to(self, recipient: str, text: str) -> Optional[str]:
         """Sends one message if the rate limit allows; returns the txid or None."""
@@ -581,6 +594,7 @@ class Bot:
         return ("Paused. " + s) if self.stage == "paused" else s
 
     def status(self) -> dict:
+        self._out_budget_left(self.ctx.clock())       # drops a rate-limit warning that has expired
         err = self.config_error or self.node_error or self.error
         if err is None and self.balance is not None and not self.funded():
             err = "Wallet empty: send a little KAS to the bot address"

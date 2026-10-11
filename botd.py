@@ -14,7 +14,7 @@ Environment (set by the Kaspa Quick Start panel):
   BRIDGE_STATS_URL     optional stratum bridge stats (mining bot hashrate)
   BOTS_CONF            default /conf/bots.json
   STATE_DIR            default /state
-  BOT_MAX_OUT_PER_HOUR default 30 (messages a bot may send per hour)
+  BOT_MAX_OUT_PER_HOUR default 50 (messages a bot may send per hour)
   CHAIN_POLL_SECONDS   default 1
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ def env_config() -> dict:
         "wrpc_url": os.environ.get("NODE_WRPC", "ws://kaspad:17110"),
         "indexer_url": os.environ.get("KACHAT_INDEXER_URL", "").strip(),
         "bridge_url": os.environ.get("BRIDGE_STATS_URL", "").strip(),
-        "max_out_per_hour": int(os.environ.get("BOT_MAX_OUT_PER_HOUR", "30")),
+        "max_out_per_hour": int(os.environ.get("BOT_MAX_OUT_PER_HOUR", "50")),
         "chain_poll": float(os.environ.get("CHAIN_POLL_SECONDS", "1")),
     }
 

@@ -40,7 +40,7 @@ HEARTBEAT_EVERY = 5.0
 
 class Daemon:
     def __init__(self, *, conf_path: str, state_dir: str, network: str, grpc_target: str, wrpc_url: str,
-                 indexer_url: str = "", bridge_url: str = "", max_out_per_hour: int = 30,
+                 indexer_url: str = "", bridge_url: str = "", max_out_per_hour: int = 50,
                  chain_poll: float = 1.0, node=None, backend=None):
         self.conf_path = conf_path
         self.state_dir = state_dir

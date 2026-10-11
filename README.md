@@ -60,7 +60,8 @@ Addresses are checked (right network, valid checksum) before they are accepted.
 
 - Only the owner can make a bot spend. Before pairing, a stranger gets at most one "This bot is private."
   a day; after pairing, everyone else is ignored.
-- A bot sends at most 30 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet.
+- A bot sends at most 50 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet. A reset from the
+  panel starts that hour over, so its greeting always goes out.
 - A bot never sends KAS anywhere but back to itself; keep only a small amount in it.
 
 ---
@@ -112,7 +113,7 @@ Addresses are checked (right network, valid checksum) before they are accepted.
 | `KASPA_NETWORK` | `mainnet` | `mainnet` or `testnet-10` |
 | `KACHAT_INDEXER_URL` | empty | optional chat indexer for catching up |
 | `BRIDGE_STATS_URL` | empty | optional stratum bridge stats (hashrate) |
-| `BOT_MAX_OUT_PER_HOUR` | `30` | messages one bot may send per hour |
+| `BOT_MAX_OUT_PER_HOUR` | `50` | messages one bot may send per hour |
 | `BOTS_CONF` / `STATE_DIR` | `/conf/bots.json` / `/state` | file locations |
 
 ### Command line
