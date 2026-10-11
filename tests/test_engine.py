@@ -153,13 +153,13 @@ def test_rate_limit_caps_spending(make_bot, ctxf):
     ctxf.clock.t += 3601                     # setup itself used the hour's budget
     for _ in range(10):
         say(bot, "status")
-    assert len(ctxf.sent) == 5
+    assert len(ctxf.sent) == 6               # 5 + the one "limit reached, reset?" question
     assert "Rate limit" in (bot.error or "")
     run(bot.notify("alert"))
-    assert len(ctxf.sent) == 5
+    assert len(ctxf.sent) == 6
     ctxf.clock.t += 3601
     say(bot, "status")
-    assert len(ctxf.sent) == 6
+    assert len(ctxf.sent) == 7
 
 
 def test_rate_limit_counts_everything(make_bot, ctxf):
@@ -590,3 +590,41 @@ def test_rate_limit_warning_clears_when_the_hour_passes(make_bot, ctxf):
 def test_default_limit_is_fifty():
     from kachat.bots.base import DEFAULT_MAX_OUT_PER_HOUR
     assert DEFAULT_MAX_OUT_PER_HOUR == 50
+
+
+def _hit_limit(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], max_out=5)
+    ctxf.clock.t += 3601
+    for _ in range(6):
+        say(bot, "status")
+    return bot
+
+
+def test_limit_reached_asks_the_owner_once(make_bot, ctxf):
+    bot = _hit_limit(make_bot, ctxf)
+    asks = [t for t in texts(ctxf) if "reached my limit of 5 messages within an hour" in t]
+    assert len(asks) == 1 and "yes or no" in asks[0]
+    say(bot, "status")                                       # still over: no second question
+    assert len([t for t in texts(ctxf) if "reached my limit" in t]) == 1
+
+
+def test_owner_says_yes_and_the_limit_resets(make_bot, ctxf):
+    bot = _hit_limit(make_bot, ctxf)
+    say(bot, "yes")
+    assert texts(ctxf)[-1] == "Limit reset. I'll keep sending."
+    assert bot.status()["error"] is None
+    say(bot, "status")
+    assert texts(ctxf)[-1].startswith("Active")
+
+
+def test_owner_says_no_and_the_bot_waits(make_bot, ctxf):
+    bot = _hit_limit(make_bot, ctxf)
+    say(bot, "no")
+    assert texts(ctxf)[-1].startswith("OK. I'll wait")
+    n = len(ctxf.sent)
+    say(bot, "status")
+    say(bot, "yes")                                          # the question is answered already
+    assert len(ctxf.sent) == n
+    ctxf.clock.t += 3601
+    say(bot, "status")
+    assert texts(ctxf)[-1].startswith("Active")

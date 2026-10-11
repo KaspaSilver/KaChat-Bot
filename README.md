@@ -62,6 +62,8 @@ Addresses are checked (right network, valid checksum) before they are accepted.
   a day; after pairing, everyone else is ignored.
 - A bot sends at most 50 messages an hour (`BOT_MAX_OUT_PER_HOUR`), so nothing can drain its wallet. A reset from the
   panel starts that hour over, so its greeting always goes out.
+  When a bot reaches the limit it tells its owner once and asks whether to reset it: `yes` starts the
+  hour over and it keeps sending, `no` waits until the hour has passed.
 - A bot never sends KAS anywhere but back to itself; keep only a small amount in it.
 
 ---

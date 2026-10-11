@@ -34,6 +34,7 @@ PRIVATE_REPLIES_PER_DAY = 20
 DEFAULT_MAX_OUT_PER_HOUR = 50
 REQUIRED = object()
 
+YES_NO = {"yes": True, "y": True, "yeah": True, "ok": True, "no": False, "n": False, "nope": False}
 COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
 MAX_WATCHED = 10                 # addresses one mining or wallet bot may watch
 SKIP_WORDS = ("skip", "default", "keep", "-")
@@ -203,6 +204,8 @@ class Bot:
 
     def _clear_rate_limit(self) -> None:
         self.data["outTimes"] = []
+        self.data["limitAsked"] = False
+        self.data["limitQuestion"] = False
         if self.error and self.error.startswith("Rate limit"):
             self.error = None
 
@@ -270,22 +273,57 @@ class Bot:
         times = [t for t in self.data.get("outTimes", []) if now - t < 3600]
         self.data["outTimes"] = times
         left = self.ctx.max_out_per_hour - len(times)
-        # The hour has moved on: the warning is not true any more.
-        if left > 0 and self.error and self.error.startswith("Rate limit"):
-            self.error = None
+        # The hour has moved on: the warning and the question are not true any more.
+        if left > 0:
+            if self.error and self.error.startswith("Rate limit"):
+                self.error = None
+            self.data["limitAsked"] = False
+            self.data["limitQuestion"] = False
         return left
 
-    async def send_to(self, recipient: str, text: str) -> Optional[str]:
-        """Sends one message if the rate limit allows; returns the txid or None."""
+    def limit_text(self) -> str:
+        return (f"I've reached my limit of {self.ctx.max_out_per_hour} messages within an hour, so I've stopped sending.\n"
+                "Reset the limit and keep sending? Reply yes or no.")
+
+    async def _ask_about_limit(self) -> None:
+        """Once per full hour: tell the owner the limit was reached and ask whether to reset it."""
+        if not self.owner or self.data.get("limitAsked"):
+            return
+        self.data["limitAsked"] = True
+        if await self.send_to(self.owner, self.limit_text(), force=True):
+            self.data["limitQuestion"] = True
+        self.save()
+
+    async def _answer_limit(self, cmd: str) -> bool:
+        """The owner's yes/no to the limit question; True when it was one."""
+        if not self.data.get("limitQuestion") or cmd not in YES_NO:
+            return False
+        self.data["limitQuestion"] = False
+        if YES_NO[cmd]:
+            self._clear_rate_limit()
+            self.data["limitAsked"] = False
+            self.save()
+            await self.say("Limit reset. I'll keep sending.")
+        else:
+            self.save()
+            await self.send_to(self.owner, "OK. I'll wait until the hour has passed, then send again.", force=True)
+        return True
+
+    async def send_to(self, recipient: str, text: str, force: bool = False) -> Optional[str]:
+        """Sends one message if the rate limit allows; returns the txid or None.
+        `force` is only for the limit question and its answer (at most two a full hour)."""
         if not self.enabled:
             return None
         now = self.ctx.clock()
-        if self._out_budget_left(now) <= 0:
+        if not force and self._out_budget_left(now) <= 0:
             self.error = f"Rate limit: {self.ctx.max_out_per_hour} messages in the last hour; holding back"
             log.warning("[%s] %s", self.id, self.error)
             self.save()
+            if recipient == self.owner:
+                await self._ask_about_limit()
             return None
-        self.data["outTimes"].append(now)
+        if not force:
+            self.data["outTimes"].append(now)
         try:
             txid = await self.ctx.send(self, recipient, text)
         except Exception as exc:
@@ -296,7 +334,7 @@ class Bot:
         if recipient == self.owner:
             self.store.append_history("out", text, txid, int(now))
         self.data["lastOutAt"] = int(now)
-        if self.error and (self.error.startswith("Could not send") or self.error.startswith("Rate limit")):
+        if self.error and (self.error.startswith("Could not send") or (not force and self.error.startswith("Rate limit"))):
             self.error = None
         self.save()
         return txid
@@ -466,6 +504,8 @@ class Bot:
         cmd = (text or "").strip().lower().lstrip("/").rstrip(".!?")
         in_setup = self.stage == "setup"
         first, _, rest = (text or "").strip().partition(" ")
+        if await self._answer_limit(cmd):
+            return
         # `add` is a short conversation of its own (address, then a nickname on wallet bots).
         if self.data.get("adding"):
             if cmd == "cancel":
