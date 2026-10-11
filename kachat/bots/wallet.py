@@ -17,11 +17,10 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from ..address import AddressError, short_address, validate_address
-from .base import AnswerError, Bot, Question, fmt_kas, parse_number
+from ..address import short_address
+from .base import MAX_WATCHED, AnswerError, Bot, Question, fmt_kas, parse_address_list, parse_number
 
 SETTLE = 4.0
-MAX_ADDRESSES = 10
 MAX_NICKNAME = 32
 NO_NICKNAME = ("none", "no", "nothing", "n/a")
 
@@ -29,6 +28,8 @@ NO_NICKNAME = ("none", "no", "nothing", "n/a")
 class WalletBot(Bot):
     TYPE = "wallet"
     TITLE = "Wallet bot"
+    ADDRESS_KEY = "addresses"
+    ASKS_NICKNAME = True
 
     def __init__(self, *a, **kw):
         self._buffer: List[tuple] = []     # (time, address, added, removed)
@@ -40,23 +41,7 @@ class WalletBot(Bot):
     def questions(self) -> List[Question]:
         net = self.ctx.network
 
-        def parse_addrs(t: str) -> List[str]:
-            parts = [p for p in t.replace(",", " ").replace(";", " ").split() if p]
-            if not parts:
-                raise AnswerError("Paste one or more kaspa: addresses.")
-            if len(parts) > MAX_ADDRESSES:
-                raise AnswerError(f"At most {MAX_ADDRESSES} addresses, please.")
-            out = []
-            for p in parts:
-                try:
-                    a = validate_address(p, net)
-                except AddressError as exc:
-                    raise AnswerError(f"{p[:24]}… doesn't look right: {exc}.")
-                if a == self.address:
-                    raise AnswerError("That's my own address; I can't watch it (every message I send would trigger another).")
-                if a not in out:
-                    out.append(a)
-            return out
+        parse_addrs = parse_address_list(net, not_self=self.address, most=MAX_WATCHED)
 
         def parse_nicknames(t: str) -> Dict[str, str]:
             addrs = ((self.data.get("setup") or {}).get("draft") or {}).get("addresses") or self.settings.get("addresses") or []

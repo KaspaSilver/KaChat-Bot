@@ -1,6 +1,7 @@
 """Conversation engine and the three bot types, with sending and the chain mocked."""
 from conftest import BOT_KEY, OTHER_KEY, USER_KEY, FakeStore, addr, make_cfg, run
 
+from kachat.address import short_address
 from kachat.bots.base import PRIVATE_REPLY
 
 USER = addr(USER_KEY)
@@ -75,7 +76,7 @@ def test_pairing_then_setup_questions(make_bot, ctxf):
     assert "3/3" in texts(ctxf)[-1]
     say(bot, "30")
     assert bot.stage == "active"
-    assert bot.settings == {"address": WATCH, "minRewardKas": 0, "hashrateDropPct": 30.0}
+    assert bot.settings == {"addresses": [WATCH], "minRewardKas": 0, "hashrateDropPct": 30.0}
     assert texts(ctxf)[-1].startswith("All set!")
 
 
@@ -107,7 +108,7 @@ def test_commands(make_bot, ctxf):
     say(bot, "skip")
     say(bot, "2")
     say(bot, "skip")
-    assert bot.stage == "active" and bot.settings["minRewardKas"] == 2.0 and bot.settings["address"] == WATCH
+    assert bot.stage == "active" and bot.settings["minRewardKas"] == 2.0 and bot.settings["addresses"] == [WATCH]
 
 
 def test_reset_forgets_settings_and_asks_again(make_bot, ctxf):
@@ -122,7 +123,7 @@ def test_reset_forgets_settings_and_asks_again(make_bot, ctxf):
     say(bot, WATCH)
     say(bot, "skip")
     say(bot, "skip")
-    assert bot.stage == "active" and bot.settings["address"] == WATCH and bot.settings["minRewardKas"] == 0
+    assert bot.stage == "active" and bot.settings["addresses"] == [WATCH] and bot.settings["minRewardKas"] == 0
     say(bot, "help")
     assert "reset" in texts(ctxf)[-1]
 
@@ -187,7 +188,7 @@ def test_state_survives_restart(make_bot, ctxf):
     paired(make_bot, ctxf, "mining", [WATCH, "0", "no"], store=store)
     seen = list(store.data["seen"])
     again = make_bot("mining", store=store)
-    assert again.owner == USER and again.stage == "active" and again.settings["address"] == WATCH
+    assert again.owner == USER and again.stage == "active" and again.settings["addresses"] == [WATCH]
     run(again.handle_message(USER, "status", seen[-1]))      # duplicate txid: ignored
     assert ctxf.sent == []
 
@@ -394,3 +395,77 @@ def test_mining_without_bridge_skips_hashrate_question(ctxf):
     say(bot, WATCH)
     say(bot, "0")
     assert bot.stage == "active" and bot.settings["hashrateDropPct"] is None
+
+
+# ── add: watch another address (mining, wallet; up to 10) ───────────────────
+
+def test_wallet_add_with_nickname(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "wallet", [WATCH, "Savings", "0"])
+    say(bot, "add")
+    assert "Which address should I add?" in texts(ctxf)[-1]
+    say(bot, "kaspa:broken")
+    assert "doesn't look right" in texts(ctxf)[-1] and bot.data.get("adding")
+    say(bot, WATCH2)
+    assert "What should I call it?" in texts(ctxf)[-1]
+    say(bot, "Mining payouts")
+    assert texts(ctxf)[-1] == "Added Mining payouts. Now watching 2 addresses."
+    assert bot.settings["addresses"] == [WATCH, WATCH2]
+    assert bot.settings["nicknames"] == {WATCH: "Savings", WATCH2: "Mining payouts"}
+    assert bot.watched_addresses() == {WATCH, WATCH2}
+    assert not bot.data.get("adding")
+
+
+def test_add_inline_duplicate_self_cancel_and_other_commands(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "wallet", [WATCH, "none", "0"])
+    say(bot, f"add {WATCH}")
+    assert texts(ctxf)[-1] == "I'm already watching that one." and not bot.data.get("adding")
+    say(bot, f"add {BOTADDR}")
+    assert "my own address" in texts(ctxf)[-1]
+    say(bot, "cancel")
+    assert texts(ctxf)[-1].startswith("Cancelled") and bot.settings["addresses"] == [WATCH]
+    say(bot, "add")
+    say(bot, "status")                        # another command ends the add
+    assert texts(ctxf)[-1].startswith("Active.") and not bot.data.get("adding")
+    say(bot, f"add {addr('66' * 32, 'testnet-10')}")   # wrong network
+    assert "kaspatest" in texts(ctxf)[-1]
+
+
+def test_add_stops_at_ten(make_bot, ctxf):
+    keys = [f"{i:02x}" * 32 for i in range(0x60, 0x6a)]          # 10 addresses
+    bot = paired(make_bot, ctxf, "wallet", [" ".join(addr(k) for k in keys[:9]), "none", "0"])
+    say(bot, f"add {addr(keys[9])}")
+    say(bot, "none")
+    assert "Now watching 10 addresses" in texts(ctxf)[-1]
+    say(bot, "add")
+    assert texts(ctxf)[-1] == "I'm already watching 10 addresses, the most I can."
+    say(bot, " ".join(addr(k) for k in keys) + " " + addr("7f" * 32))   # not an add answer
+    assert len(bot.settings["addresses"]) == 10
+
+
+def test_mining_add_and_reward_names_the_address(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    say(bot, "add")
+    say(bot, WATCH2)                          # no nickname question on mining
+    assert texts(ctxf)[-1] == f"Added {short_address(WATCH2)}. Now watching 2 addresses."
+    assert bot.watched_addresses() == {WATCH, WATCH2}
+    run(bot.on_utxos(WATCH2, [_entry("f" * 64, 387_000_000)], []))
+    msg = texts(ctxf)[-1]
+    assert msg.startswith(short_address(WATCH2) + "\nBlock reward: 3.87 KAS")
+    say(bot, "help")
+    assert "add - watch another address" in texts(ctxf)[-1]
+
+
+def test_price_bot_has_no_add(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["0.05", "no", "no", "no"])
+    say(bot, "add")
+    assert "doesn't watch addresses" in texts(ctxf)[-1]
+    say(bot, "help")
+    assert "add -" not in texts(ctxf)[-1]
+
+
+def test_old_single_address_mining_settings_still_work(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    bot.data["settings"] = {"address": WATCH, "minRewardKas": 0, "hashrateDropPct": None}
+    assert bot.watched_addresses() == {WATCH}
+    say(bot, f"add {WATCH2}")
+    assert bot.settings["addresses"] == [WATCH, WATCH2]

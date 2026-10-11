@@ -34,7 +34,8 @@ PRIVATE_REPLIES_PER_DAY = 20
 DEFAULT_MAX_OUT_PER_HOUR = 30
 REQUIRED = object()
 
-COMMANDS = ("help", "status", "settings", "change", "reset", "pause", "resume", "test")
+COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
+MAX_WATCHED = 10                 # addresses one mining or wallet bot may watch
 SKIP_WORDS = ("skip", "default", "keep", "-")
 
 
@@ -210,6 +211,13 @@ class Bot:
 
     def watched_addresses(self) -> set:
         return set()
+
+    # Address-watching bots (mining, wallet) set ADDRESS_KEY and get the `add` command.
+    ADDRESS_KEY: Optional[str] = None
+    ASKS_NICKNAME = False
+
+    def address_list(self) -> List[str]:
+        return list(self.settings.get(self.ADDRESS_KEY) or []) if self.ADDRESS_KEY else []
 
     async def tick(self, now: float) -> None:
         pass
@@ -390,14 +398,17 @@ class Bot:
     # ── commands ────────────────────────────────────────────────────────────
 
     def help_text(self) -> str:
-        return ("Commands:\n"
-                "status - what I'm doing\n"
-                "settings - my settings\n"
-                "change - answer the setup questions again\n"
-                "reset - forget my settings and start setup over\n"
-                "pause / resume - stop / restart notifications\n"
-                "test - send a sample notification\n"
-                "help - this list")
+        lines = [
+            "Commands:",
+            "status - what I'm doing",
+            "settings - my settings",
+            "change - answer the setup questions again",
+            "reset - forget my settings and start setup over",
+        ]
+        if self.ADDRESS_KEY:
+            lines.append(f"add - watch another address (up to {MAX_WATCHED})")
+        lines += ["pause / resume - stop / restart notifications", "test - send a sample notification", "help - this list"]
+        return "\n".join(lines)
 
     def status_text(self) -> str:
         state = {"active": "Active", "paused": "Paused", "setup": "Setting up"}.get(self.stage, self.stage)
@@ -411,6 +422,21 @@ class Bot:
     async def _dispatch(self, text: str) -> None:
         cmd = (text or "").strip().lower().lstrip("/").rstrip(".!?")
         in_setup = self.stage == "setup"
+        first, _, rest = (text or "").strip().partition(" ")
+        # `add` is a short conversation of its own (address, then a nickname on wallet bots).
+        if self.data.get("adding"):
+            if cmd == "cancel":
+                self.data["adding"] = None
+                self.save()
+                await self.say("Cancelled. Nothing was added.")
+                return
+            if cmd not in COMMANDS and first.lower().lstrip("/") != "add":
+                await self._add_answer(text)
+                return
+            self.data["adding"] = None           # another command ends it
+        if first.lower().lstrip("/") == "add" and not in_setup:
+            await self._add_start(rest.strip())
+            return
         if cmd not in COMMANDS:
             if in_setup:
                 await self._answer(text)
@@ -449,6 +475,62 @@ class Bot:
             await self.say("Resumed. " + self.summary())
         elif cmd == "test":
             await self.say("Test: " + self.sample_notification())
+
+    # ── add: watch another address ──────────────────────────────────────────
+
+    async def _add_start(self, inline: str) -> None:
+        if not self.ADDRESS_KEY:
+            await self.say("This bot doesn't watch addresses. Send help for the commands.")
+            return
+        if len(self.address_list()) >= MAX_WATCHED:
+            await self.say(f"I'm already watching {MAX_WATCHED} addresses, the most I can.")
+            return
+        self.data["adding"] = {"step": "address"}
+        self.save()
+        if inline:
+            await self._add_answer(inline)
+        else:
+            await self.say("Which address should I add? (paste the kaspa: address, or cancel)")
+
+    async def _add_answer(self, text: str) -> None:
+        adding = self.data.get("adding") or {}
+        t = (text or "").strip()
+        if adding.get("step") == "address":
+            try:
+                addr = parse_address_answer(self.ctx.network, not_self=self.address)(t)
+            except AnswerError as exc:
+                await self.say(f"{exc} Paste the kaspa: address to add, or cancel.")
+                return
+            if addr in self.address_list():
+                self.data["adding"] = None
+                self.save()
+                await self.say("I'm already watching that one.")
+                return
+            if self.ASKS_NICKNAME:
+                self.data["adding"] = {"step": "nickname", "address": addr}
+                self.save()
+                await self.say("What should I call it? Send a nickname (like Savings), or none.")
+                return
+            await self._add_finish(addr, None)
+            return
+        if adding.get("step") == "nickname":
+            name = None if t.lower() in ("none", "no", "nothing", "n/a", "skip", "-") else t
+            if name and len(name) > 32:
+                await self.say("Keep a nickname to 32 characters or fewer. What should I call it?")
+                return
+            await self._add_finish(adding["address"], name)
+
+    async def _add_finish(self, addr: str, name: Optional[str]) -> None:
+        settings = dict(self.settings)
+        settings[self.ADDRESS_KEY] = self.address_list() + [addr]
+        if name:
+            settings["nicknames"] = {**(settings.get("nicknames") or {}), addr: name}
+        self.data["settings"] = settings
+        self.data["adding"] = None
+        self.on_settings_changed()
+        self.save()
+        n = len(settings[self.ADDRESS_KEY])
+        await self.say(f"Added {name or short_address(addr)}. Now watching {n} address{'es' if n != 1 else ''}.")
 
     # ── status for the panel ────────────────────────────────────────────────
 
@@ -498,6 +580,28 @@ def parse_address_answer(network: str, not_self: Optional[str] = None) -> Callab
         if not_self and a == not_self:
             raise AnswerError("That's my own address; please send the address to watch.")
         return a
+    return parse
+
+
+def parse_address_list(network: str, not_self: Optional[str] = None, most: int = MAX_WATCHED) -> Callable[[str], List[str]]:
+    """One or more addresses (spaces, commas or semicolons between them), each checked."""
+    def parse(text: str) -> List[str]:
+        parts = [p for p in (text or "").replace(",", " ").replace(";", " ").split() if p]
+        if not parts:
+            raise AnswerError("Paste one or more kaspa: addresses.")
+        out: List[str] = []
+        for p in parts:
+            try:
+                a = validate_address(p, network)
+            except AddressError as exc:
+                raise AnswerError(f"{p[:24]}… doesn't look right: {exc}.")
+            if not_self and a == not_self:
+                raise AnswerError("That's my own address; I can't watch it (every message I send would trigger another).")
+            if a not in out:
+                out.append(a)
+        if len(out) > most:
+            raise AnswerError(f"At most {most} addresses, please.")
+        return out
     return parse
 
 

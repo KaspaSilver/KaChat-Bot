@@ -40,6 +40,7 @@ settings and conversation and waits for the pairing code again.
 | `settings` | its current settings |
 | `change` | answer the setup questions again (`skip` keeps the current value) |
 | `reset` | forget the settings and start setup over from the defaults (you stay paired) |
+| `add` | mining and wallet bots: watch another address (it asks for the address, and a nickname on wallet bots; `add kaspa:…` works in one go; up to 10; `cancel` stops it) |
 | `pause` / `resume` | stop / restart notifications |
 | `test` | send a sample notification |
 
@@ -49,7 +50,7 @@ settings and conversation and waits for the pairing code again.
   hashrate drop of how many % (or `no`; needs the stratum bridge).
 - **Price** (USD): alert above which price; alert below which price; daily summary time (e.g. `09:00`, container
   time zone); alert on a move of how many % within 24 h. Answer `no` to any of them.
-- **Wallet**: one or more addresses (separated by spaces); a nickname for each, or none; the smallest amount to report.
+- **Wallet**: one or more addresses (separated by spaces, up to 10); a nickname for each, or none; the smallest amount to report.
 
 Addresses are checked (right network, valid checksum) before they are accepted.
 
