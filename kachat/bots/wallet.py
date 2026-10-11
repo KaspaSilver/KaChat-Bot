@@ -1,5 +1,12 @@
 """Wallet bot: a message when a watched address receives or sends KAS.
 
+Each address can have a nickname (asked in setup, optional). A message is just the amount
+and the address's new balance, by nickname when it has one:
+
+    Savings received 12.5 KAS
+    Balance: 1,234.75 KAS
+
+
 Driven by a UtxosChanged subscription on the watched addresses. A receive is
 a new output (its txid is the paying transaction). A send shows up as removed
 outputs; the spending transaction is looked up in what the chain follower saw
@@ -15,6 +22,8 @@ from .base import AnswerError, Bot, Question, fmt_kas, parse_number
 
 SETTLE = 4.0
 MAX_ADDRESSES = 10
+MAX_NICKNAME = 32
+NO_NICKNAME = ("none", "no", "nothing", "n/a")
 
 
 class WalletBot(Bot):
@@ -26,7 +35,7 @@ class WalletBot(Bot):
         super().__init__(*a, **kw)
 
     def default_settings(self) -> dict:
-        return {"addresses": [], "minKas": 0}
+        return {"addresses": [], "nicknames": {}, "minKas": 0}
 
     def questions(self) -> List[Question]:
         net = self.ctx.network
@@ -49,19 +58,49 @@ class WalletBot(Bot):
                     out.append(a)
             return out
 
+        def parse_nicknames(t: str) -> Dict[str, str]:
+            addrs = ((self.data.get("setup") or {}).get("draft") or {}).get("addresses") or self.settings.get("addresses") or []
+            text = (t or "").strip()
+            if text.lower() in NO_NICKNAME:
+                return {}
+            names = [text] if len(addrs) == 1 else [n.strip() for n in text.split(",")]
+            if len(names) != len(addrs):
+                raise AnswerError(
+                    f"I'm watching {len(addrs)} addresses: send {len(addrs)} nicknames in the same order, "
+                    "separated by commas, or none."
+                )
+            out = {}
+            for a, n in zip(addrs, names):
+                if len(n) > MAX_NICKNAME:
+                    raise AnswerError(f"Keep a nickname to {MAX_NICKNAME} characters or fewer.")
+                if n and n.lower() not in NO_NICKNAME:
+                    out[a] = n
+            return out
+
+        def show_nicknames(v) -> str:
+            return ", ".join(v.values()) if v else "none"
+
         def parse_min(t: str):
             return parse_number(t, minimum=0, what="an amount in KAS, like 0 or 10")
 
         return [
             Question("addresses", "Which address(es) should I watch? (paste kaspa: addresses, separated by spaces)",
                      parse_addrs, show=lambda v: ", ".join(short_address(a) for a in v) or "none"),
+            Question("nicknames", "What should I call it? Send a nickname (like Savings), or none. "
+                     "For several addresses, nicknames in the same order separated by commas.",
+                     parse_nicknames, {}, show=show_nicknames),
             Question("minKas", "Smallest amount to report, in KAS? (0 = everything)", parse_min, 0,
                      show=lambda v: f"{v:g} KAS"),
         ]
 
+    def name_of(self, address: str) -> str:
+        """The address's nickname, or the address shortened."""
+        return (self.settings.get("nicknames") or {}).get(address) or short_address(address)
+
     def describe_settings(self) -> str:
         s = self.settings
-        addrs = "\n".join(s.get("addresses") or []) or "none"
+        nick = s.get("nicknames") or {}
+        addrs = "\n".join(f"{nick[a]}: {a}" if a in nick else a for a in s.get("addresses") or []) or "none"
         return f"Watching:\n{addrs}\nReporting amounts of at least {float(s.get('minKas') or 0):g} KAS"
 
     def summary(self) -> str:
@@ -69,7 +108,7 @@ class WalletBot(Bot):
         if not n:
             return "Not set up"
         if n == 1:
-            return f"Watching {short_address(self.settings['addresses'][0])}"
+            return f"Watching {self.name_of(self.settings['addresses'][0])}"
         return f"Watching {n} addresses"
 
     def sample_notification(self) -> str:
@@ -82,11 +121,9 @@ class WalletBot(Bot):
         return set(self.settings.get("addresses") or [])
 
     def event_text(self, address: str, net: int, txid: Optional[str], balance: Optional[int]) -> str:
-        verb = "Received" if net > 0 else "Sent"
-        lines = [f"{verb} {fmt_kas(abs(net))} {'on' if net > 0 else 'from'} {short_address(address)}",
-                 f"Balance: {fmt_kas(balance)}"]
-        lines.append(f"tx: {txid}" if txid else "tx: unknown")
-        return "\n".join(lines)
+        # Just the amount and the new balance, by nickname when there is one: no transaction id.
+        verb = "received" if net > 0 else "sent"
+        return f"{self.name_of(address)} {verb} {fmt_kas(abs(net))}\nBalance: {fmt_kas(balance)}"
 
     async def on_utxos(self, address: str, added: list, removed: list) -> None:
         if address in self.watched_addresses():

@@ -131,9 +131,9 @@ def test_commands_during_setup_reask(make_bot, ctxf):
     bot = make_bot("wallet")
     say(bot, "482915")
     say(bot, "pause")
-    assert "finish setup" in texts(ctxf)[-1] and "1/2" in texts(ctxf)[-1]
+    assert "finish setup" in texts(ctxf)[-1] and "1/3" in texts(ctxf)[-1]
     say(bot, "help")
-    assert "Commands" in texts(ctxf)[-1] and "1/2" in texts(ctxf)[-1]
+    assert "Commands" in texts(ctxf)[-1] and "1/3" in texts(ctxf)[-1]
     say(bot, "skip")                       # required question
     assert "needed" in texts(ctxf)[-1]
 
@@ -339,36 +339,49 @@ def test_wallet_setup_validates_addresses(make_bot, ctxf):
     say(bot, f"{WATCH}, kaspa:qqbroken")
     assert "doesn't look right" in texts(ctxf)[-1]
     say(bot, f"{WATCH}, {WATCH2} {WATCH}")
+    say(bot, "Savings")                               # two addresses, one nickname: asked again
+    assert "2 nicknames" in texts(ctxf)[-1]
+    say(bot, "Savings, Mining payouts")
     say(bot, "5")
-    assert bot.settings == {"addresses": [WATCH, WATCH2], "minKas": 5.0}
+    assert bot.settings == {"addresses": [WATCH, WATCH2], "nicknames": {WATCH: "Savings", WATCH2: "Mining payouts"}, "minKas": 5.0}
     assert bot.watched_addresses() == {WATCH, WATCH2}
 
 
 def test_wallet_received_and_sent(make_bot, ctxf):
-    bot = paired(make_bot, ctxf, "wallet", [WATCH, "1"])
+    bot = paired(make_bot, ctxf, "wallet", [WATCH, "Savings", "1"])
     t = ctxf.clock.t
     ctxf.clock.t = t
     run(bot.on_utxos(WATCH, [_w("a" * 64, 1_250_000_000)], []))
     run(bot.tick(t + 1))
     assert ctxf.sent == []                          # settling
     run(bot.tick(t + 5))
-    assert texts(ctxf)[-1].startswith("Received 12.5 KAS on kaspa:") and "a" * 64 in texts(ctxf)[-1]
+    assert texts(ctxf)[-1].startswith("Savings received 12.5 KAS\nBalance: ") and "a" * 64 not in texts(ctxf)[-1]
     # a send with change: spends a's coin, change comes back in tx b
     ctxf.clock.t = t + 10
     run(bot.on_utxos(WATCH, [_w("b" * 64, 250_000_000, 1)], [_w("a" * 64, 1_250_000_000)]))
     run(bot.tick(t + 20))
-    assert texts(ctxf)[-1].startswith("Sent 10 KAS from") and "b" * 64 in texts(ctxf)[-1]
+    assert texts(ctxf)[-1].startswith("Savings sent 10 KAS\nBalance: ") and "b" * 64 not in texts(ctxf)[-1]
     # a sweep (no change): spender comes from the chain follower
     ctxf.spenders[f"{'b' * 64}:1"] = "c" * 64
     ctxf.clock.t = t + 30
     run(bot.on_utxos(WATCH, [], [_w("b" * 64, 250_000_000, 1)]))
     run(bot.tick(t + 40))
-    assert texts(ctxf)[-1].startswith("Sent 2.5 KAS") and "c" * 64 in texts(ctxf)[-1]
+    assert texts(ctxf)[-1].startswith("Savings sent 2.5 KAS") and "c" * 64 not in texts(ctxf)[-1]
     # below minKas
     ctxf.clock.t = t + 50
     run(bot.on_utxos(WATCH, [_w("d" * 64, 50_000_000)], []))
     run(bot.tick(t + 60))
     assert len(ctxf.sent) == 3
+
+
+def test_wallet_without_a_nickname_uses_the_address(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "wallet", [WATCH, "none", "0"])
+    assert bot.settings["nicknames"] == {}
+    t = ctxf.clock.t
+    run(bot.on_utxos(WATCH, [_w("e" * 64, 100_000_000)], []))
+    run(bot.tick(t + 5))
+    msg = texts(ctxf)[-1]
+    assert msg.startswith("kaspa:") and " received 1 KAS\nBalance: " in msg and len(msg.split("\n")) == 2
 
 
 def test_mining_without_bridge_skips_hashrate_question(ctxf):

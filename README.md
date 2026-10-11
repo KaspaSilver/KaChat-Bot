@@ -7,7 +7,7 @@ pairs with it, asks a few setup questions in the chat, and then messages you whe
 |---|---|
 | **Mining** | every block reward paid to your mining address (reward, balance, pool hashrate), and optionally when the hashrate drops |
 | **Price** | when KAS crosses a price you chose (once per crossing), a daily summary, and big moves within 24 h |
-| **Wallet** | when a watched address receives or sends KAS (amount, balance, transaction id) |
+| **Wallet** | when a watched address receives or sends KAS: the amount and its new balance, by nickname |
 
 Messages are ordinary KaChat 1:1 messages: end-to-end encrypted (ephemeral secp256k1 ECDH, HKDF-SHA256,
 ChaCha20-Poly1305) and sent as a self-spend, so a message only costs the network fee (about 0.002 KAS).
@@ -49,7 +49,7 @@ settings and conversation and waits for the pairing code again.
   hashrate drop of how many % (or `no`; needs the stratum bridge).
 - **Price** (USD): alert above which price; alert below which price; daily summary time (e.g. `09:00`, container
   time zone); alert on a move of how many % within 24 h. Answer `no` to any of them.
-- **Wallet**: one or more addresses (separated by spaces); the smallest amount to report.
+- **Wallet**: one or more addresses (separated by spaces); a nickname for each, or none; the smallest amount to report.
 
 Addresses are checked (right network, valid checksum) before they are accepted.
 
