@@ -49,6 +49,9 @@ def is_agree(text: str) -> bool:
 YES_NO = {"yes": True, "y": True, "yeah": True, "ok": True, "no": False, "n": False, "nope": False}
 COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
 MAX_WATCHED = 10                 # addresses one mining or wallet bot may watch
+# Too busy to watch (a pool's address gets a reward almost every block): more than `count`
+# payments within `seconds` and the address is dropped, with a message asking for a quieter one.
+BUSY_LIMITS = ((60, 5), (600, 20))
 SKIP_WORDS = ("skip", "default", "keep", "-")
 
 
@@ -300,6 +303,57 @@ class Bot:
 
     async def on_utxos(self, address: str, added: list, removed: list) -> None:
         pass
+
+    async def too_busy(self, address: str, added: list, removed: list) -> bool:
+        """Counts a watched address's activity; when it is far too busy to message about (a mining
+        pool, an exchange), stops watching it, tells the person, and returns True."""
+        if address not in self.address_list():
+            return False
+        now = self.ctx.clock()
+        events = len(added) + (1 if removed else 0)
+        longest = max(w for w, _ in BUSY_LIMITS)
+        act = self.data.setdefault("activity", {})
+        times = [t for t in act.get(address, []) if now - t < longest] + [now] * events
+        busy = next(((w, n) for w, n in BUSY_LIMITS if sum(1 for t in times if now - t < w) > n), None)
+        if busy is None:
+            act[address] = times[-(max(n for _, n in BUSY_LIMITS) + 1):]
+            self.data["activity"] = act
+            return False
+        act.pop(address, None)
+        name = (self.settings.get("nicknames") or {}).get(address) or short_address(address)
+        log.info("[%s] %s is too busy (%d payments in %d s): no longer watched", self.id, address, len(times), busy[0])
+        left = self.remove_watched(address)
+        window = "a minute" if busy[0] <= 60 else f"{busy[0] // 60} minutes"
+        text = (f"I stopped watching {name}: it gets too much activity (more than {busy[1]} payments in {window}), "
+                "far more than I can message you about. Please choose an address that does not have this much activity.")
+        if left:
+            text += " Send add to watch another."
+        else:
+            text += "\n\n" + self._prompt(0)
+        await self.say(text)
+        self.save()
+        return True
+
+    def remove_watched(self, address: str) -> int:
+        """Stops watching one address; how many are left. None left: setup starts over."""
+        settings = dict(self.settings)
+        remaining = [a for a in self.address_list() if a != address]
+        settings[self.ADDRESS_KEY] = remaining
+        settings.pop("address", None)                    # the mining bot's old single address
+        if settings.get("nicknames"):
+            settings["nicknames"] = {a: n for a, n in settings["nicknames"].items() if a != address}
+        buffered = getattr(self, "_buffer", None)        # a wallet bot's not-yet-sent changes
+        if buffered:
+            self._buffer = [b for b in buffered if b[1] != address]
+        if remaining:
+            self.data["settings"] = settings
+            self.on_settings_changed()
+        else:
+            self.data["settings"] = None
+            self.on_reset()
+            self.on_settings_changed()
+            self._start_setup(from_current=False)
+        return len(remaining)
 
     # ── sending ─────────────────────────────────────────────────────────────
 

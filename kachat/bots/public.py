@@ -242,6 +242,8 @@ class PublicHost(Bot):
         for p in list(self.people.values()):
             if address in p.watched_addresses():
                 try:
+                    if await p.too_busy(address, added, removed):
+                        continue                 # a pool or exchange: dropped, they were told
                     await p.on_utxos(address, added, removed)
                 except Exception:
                     log.exception("[%s] UTXO handling for %s failed", self.id, p.owner)

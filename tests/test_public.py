@@ -141,3 +141,66 @@ def test_panel_alert_goes_to_a_named_address(ctxf):
     bot = host(ctxf)
     assert run(bot.send_to(USER, "Alert: test"))
     assert texts(ctxf, USER) == ["Alert: test"]
+
+
+def _coin(i, address, coinbase=True):
+    return {"address": address, "txid": f"{i:064x}", "index": 0, "amount": 400_000_000,
+            "isCoinbase": coinbase, "blockDaaScore": i}
+
+
+def _mining_with(ctxf, *watch):
+    bot = host(ctxf)
+    start(bot, OTHER)
+    say(bot, " ".join(watch), OTHER)
+    say(bot, "0", OTHER)
+    assert bot.people[OTHER].stage == "active"
+    return bot
+
+
+def test_a_pool_address_is_dropped_with_a_message(ctxf):
+    POOL = addr("77" * 32)
+    bot = _mining_with(ctxf, WATCH, POOL)
+    before = len(texts(ctxf, OTHER))
+    for i in range(10):                                        # a reward every second
+        run(bot.on_utxos(POOL, [_coin(i + 1, POOL)], []))
+        ctxf.clock.t += 1
+    got = texts(ctxf, OTHER)[before:]
+    assert got[-1].startswith("I stopped watching") and "does not have this much activity" in got[-1]
+    assert "Send add" in got[-1]
+    assert len(got) == 6                                       # 5 rewards, then the message, then silence
+    assert bot.people[OTHER].address_list() == [WATCH]
+    assert POOL not in bot.watched_addresses() and WATCH in bot.watched_addresses()
+
+
+def test_last_busy_address_dropped_asks_for_another(ctxf):
+    POOL = addr("77" * 32)
+    bot = _mining_with(ctxf, POOL)
+    for i in range(6):
+        run(bot.on_utxos(POOL, [_coin(i + 1, POOL)], []))
+    p = bot.people[OTHER]
+    assert p.stage == "setup" and "1/2" in texts(ctxf, OTHER)[-1]
+    assert bot.watched_addresses() == set()
+
+
+def test_a_normal_miner_is_not_dropped(ctxf):
+    bot = _mining_with(ctxf, WATCH)
+    for i in range(12):                                        # a block every 2 minutes for 24 min
+        run(bot.on_utxos(WATCH, [_coin(i + 1, WATCH)], []))
+        ctxf.clock.t += 120
+    assert bot.people[OTHER].address_list() == [WATCH]
+    assert not any("stopped watching" in t for t in texts(ctxf, OTHER))
+
+
+def test_a_busy_wallet_address_is_dropped(ctxf):
+    EXCHANGE = addr("88" * 32)
+    bot = host(ctxf, "wallet")
+    start(bot, OTHER)
+    say(bot, EXCHANGE, OTHER)
+    say(bot, "Exchange", OTHER)
+    say(bot, "0", OTHER)
+    for i in range(25):                                        # a payment every 20 s
+        run(bot.on_utxos(EXCHANGE, [_coin(i + 1, EXCHANGE, coinbase=False)], []))
+        ctxf.clock.t += 20
+        run(bot.tick(ctxf.clock.t))
+    assert any(t.startswith("I stopped watching Exchange") for t in texts(ctxf, OTHER))
+    assert bot.watched_addresses() == set()

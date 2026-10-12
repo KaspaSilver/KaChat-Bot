@@ -77,6 +77,10 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
 - Every bot answers anyone while it is switched on, with no limit per person or per hour (at most 1,000
   people can use one bot). Its wallet balance is the only cap on its spending: keep only a few KAS in it.
   (Each message someone sends it costs them a network fee too, about what the bot's reply costs.)
+- An address that is far too busy to message about (a mining pool's address gets a reward almost every block, an
+  exchange's gets payments all the time) is dropped automatically: more than 5 payments in a minute, or more than
+  20 in 10 minutes, and the mining or wallet bot stops watching it and tells the person to choose an address that
+  does not have this much activity. If it was their only address, setup starts over.
 - A bot never sends KAS anywhere but back to itself, except when the panel's *Send to wallet* empties it.
 - `botd.py --send <bot> "<text>" --to <address>` sends one message to an address (the panel's alerts; bots
   have no owner to send to any more).
