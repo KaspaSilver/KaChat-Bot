@@ -21,7 +21,17 @@ from .base import NOT_PRIVATE_NOTICE, Bot, Question, day_key, is_agree
 
 FAQ_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faq", "kaspa.md")
 MISSED_MAX = 20
-GREETINGS = ("hi", "hello", "hey", "gm", "yo", "start", "menu", "help", "topics", "topic", "list", "?")
+GREETINGS = ("hi", "hello", "hey", "gm", "yo", "start", "menu", "help", "topics", "topic", "list", "?", "test",
+             "hiya", "howdy", "sup", "good morning", "good evening", "你好", "您好", "嗨", "哈喽")
+SMALL_TALK = ("haha", "hahaha", "lol", "lmao", "funny", "nice", "cool", "great", "wow", "ok", "okay", "k",
+              "哈哈", "哈哈哈", "搞笑", "搞笑的", "好的", "不错", "厉害", "😂", "🤣", "😄", "👍")
+THANKS = ("thanks", "thank you", "thx", "ty", "cheers", "谢谢", "多谢", "感谢")
+SMALL_TALK_REPLY = "Ask me anything about Kaspa, or send topics to see what I know."
+THANKS_REPLY = "You're welcome! Ask me anything else about Kaspa."
+# Every answer is in English: someone writing in another script is told so (in Chinese too,
+# the language people have asked in so far).
+ENGLISH_ONLY_REPLY = ("I can only answer in English for now. 我目前只能用英文回答，请用英文提问。"
+                      "Send topics to see what I can answer.")
 
 
 @dataclass
@@ -64,8 +74,7 @@ def best_topic(topics: List[Topic], question: str) -> Optional[Topic]:
     best: Tuple[int, Optional[Topic]] = (0, None)
     for t in topics:
         score = 0
-        for k in t.keys + [t.title]:
-            nk = _norm(k)
+        for nk in {_norm(k) for k in t.keys + [t.title]}:    # a title that repeats a key counts once
             if nk.strip() and nk in q:
                 score += len(nk.strip())
         if score > best[0]:
@@ -144,9 +153,13 @@ class FaqBot(Bot):
     def reply_for(self, text: str) -> Tuple[str, bool]:
         """The reply to one message, and whether it was an answer (False = no match)."""
         t = (text or "").strip()
-        bare = t.lower().lstrip("/").rstrip(".!?").strip()
+        bare = t.lower().lstrip("/").strip().rstrip(".!?？！。～~").strip()
         if bare in GREETINGS or not bare:
             return self.topics_text(), True
+        if bare in THANKS:
+            return THANKS_REPLY, True
+        if bare in SMALL_TALK:
+            return SMALL_TALK_REPLY, True
         if bare.isdigit():
             n = int(bare)
             if 1 <= n <= len(self.topics):
@@ -155,6 +168,12 @@ class FaqBot(Bot):
         topic = best_topic(self.topics, t)
         if topic:
             return topic.answer, True
+        if not re.search(r"[a-z]", bare):
+            return ENGLISH_ONLY_REPLY, False       # still listed as missed, so you see what people ask
+        # "Hello, test." and the like: a greeting with nothing to answer.
+        words = re.sub(r"[^a-z ]+", " ", bare).split()
+        if words and (words[0] in GREETINGS or " ".join(words[:2]) in GREETINGS) and len(words) <= 4:
+            return self.topics_text(), True
         return "I don't have an answer for that one yet. Send topics to see what I can answer.", False
 
     def _today(self) -> dict:

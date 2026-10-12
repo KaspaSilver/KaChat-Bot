@@ -13,6 +13,10 @@ Keep answers short: every reply is a small Kaspa transaction the bot pays for.
 keys: what is kaspa, what's kaspa, about kaspa, explain kaspa, tell me about kaspa, kaspa coin, what is kas
 Kaspa is a proof-of-work cryptocurrency built as a blockDAG instead of a single chain. Blocks made at the same time are all kept and ordered by the GHOSTDAG protocol, so it runs at 10 blocks per second with confirmations in seconds, while staying decentralized and secured by mining like Bitcoin.
 
+## What Kaspa is for
+keys: purpose, its purpose, use case, use cases, what is it for, what's it for, what is kaspa for, why kaspa, why use kaspa, economically, economic, economics, utility, what problem, point of kaspa, value proposition
+Kaspa is meant to be fast, decentralized digital money: you can pay anyone directly, with confirmations in seconds and tiny fees, without a bank or company in between. Like Bitcoin it has a fixed supply and is secured by proof-of-work mining, but it is built to scale to everyday payments. Its fast blocks also make it a base layer for apps and tokens built on top.
+
 ## What the name means
 keys: name mean, meaning of kaspa, why called kaspa, kaspa mean, word kaspa
 "Kaspa" is the Aramaic word for silver, a word that was also used to mean money.
@@ -34,7 +38,7 @@ keys: emission, halving, halvening, chromatic, block reward schedule, reward sch
 Kaspa uses a "chromatic" emission: the block reward halves every year, but smoothly, with a small cut every month (each month's reward is the previous one times (1/2)^(1/12)). There is no single halving day. The last KAS are expected to be mined around 2057.
 
 ## Current reward and circulating supply
-keys: current reward, block reward now, circulating supply, current supply, how many mined, mined so far, reward right now
+keys: current reward, current block reward, block reward now, block reward today, block reward right now, what is the block reward, how much is the block reward, circulating supply, current supply, how many mined, mined so far, reward right now, reward per block
 The block reward changes every month and the circulating supply grows every second, so I don't keep those numbers. A Kaspa explorer such as explorer.kaspa.org shows both live.
 
 ## Blocks per second
@@ -150,7 +154,7 @@ keys: rusty, rust, rusty kaspa, golang, go kaspad, implementation, client
 Rusty Kaspa is the Rust implementation of Kaspa and the one the network runs today. It replaced the older Go client and is what made 10 blocks per second possible.
 
 ## Node ports
-keys: port, ports, 16111, 16110, 17110, 18110, grpc, wrpc, rpc, p2p port, firewall
+keys: port, ports, what ports, which ports, ports does, node ports, open ports, 16111, 16110, 17110, 18110, grpc, wrpc, rpc, p2p port, firewall
 Mainnet node ports: 16111 for peers (p2p), 16110 for gRPC, 17110 for wRPC (Borsh) and 18110 for wRPC (JSON). Only 16111 needs to be open to the internet for incoming peers.
 
 ## Testnet

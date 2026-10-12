@@ -152,3 +152,27 @@ def test_no_hourly_limit_for_many_people(make_bot, ctxf):
         say(bot, "what is kaspa", addr(f"{70 + i:02x}" * 32))
     assert len(ctxf.sent) == 20
     assert bot.status()["error"] is None
+
+
+@pytest.mark.parametrize("question,title", [
+    ("Whats the current block reward", "Current reward and circulating supply"),
+    ("what is the block reward right now?", "Current reward and circulating supply"),
+    ("Economically what's its purpose?", "What Kaspa is for"),
+    ("what is kaspa for", "What Kaspa is for"),
+])
+def test_questions_people_asked(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("text,start", [
+    ("Hello, test.", "I answer common Kaspa questions"),
+    ("你好", "I answer common Kaspa questions"),
+    ("哈哈", "Ask me anything about Kaspa"),
+    ("搞笑的", "Ask me anything about Kaspa"),
+    ("thanks!", "You're welcome!"),
+    ("你能用中文吗？", "I can only answer in English"),
+])
+def test_greetings_small_talk_and_other_languages(make_bot, ctxf, text, start):
+    bot = live(make_bot, ctxf)
+    reply, _ = bot.reply_for(text)
+    assert reply.startswith(start)
