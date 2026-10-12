@@ -204,3 +204,9 @@ def test_greetings_small_talk_and_other_languages(make_bot, ctxf, text, start):
 ])
 def test_learn_kaspa_topics(question, title):
     assert best_topic(TOPICS, question).title == title
+
+
+def test_learn_kaspa_answers_cite_their_article():
+    assert BY_TITLE["Finality"].answer.endswith("Source: https://kaspa.com/learn-kaspa/post/finality-depth")
+    cited = [t for t in TOPICS if "\nSource: https://kaspa.com/learn-kaspa" in t.answer]
+    assert len(cited) == 26
