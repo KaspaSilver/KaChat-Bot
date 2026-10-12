@@ -11,10 +11,10 @@ Environment (set by the Kaspa Quick Start panel):
   NODE_WRPC            kaspad wRPC (Borsh), e.g. ws://kaspad:17110 (used to sign/submit)
   KASPA_NETWORK        mainnet | testnet-10
   KACHAT_INDEXER_URL   optional chat indexer for backfill after downtime
-  BRIDGE_STATS_URL     optional stratum bridge stats (mining bot hashrate)
+  BRIDGE_STATS_URL     optional stratum bridge stats (unused since bots are public)
   BOTS_CONF            default /conf/bots.json
   STATE_DIR            default /state
-  BOT_MAX_OUT_PER_HOUR default 50 (messages a bot may send per hour)
+  BOT_MAX_OUT_PER_HOUR default 50 (only for a bot run with public=False)
   CHAIN_POLL_SECONDS   default 1
 """
 from __future__ import annotations
@@ -26,6 +26,7 @@ import logging
 import os
 import signal
 import sys
+from typing import Optional
 
 from kachat.daemon import Daemon, daemon_alive, outbox_send, outbox_sweep, sweep_bot, sweep_result
 
@@ -51,7 +52,7 @@ def env_config() -> dict:
     }
 
 
-async def send_direct(cfg: dict, bot_id: str, text: str) -> dict:
+async def send_direct(cfg: dict, bot_id: str, text: str, to: Optional[str] = None) -> dict:
     """--send when no daemon is running: same bot, same rules, one message."""
     from kachat.bots import BotContext, make_bot
     from kachat.send import KaspaSdkBackend, MessageSender
@@ -77,9 +78,17 @@ async def send_direct(cfg: dict, bot_id: str, text: str) -> dict:
     try:
         if not bot.enabled:
             return {"ok": False, "txid": None, "error": "bot is disabled"}
-        if not bot.owner:
-            return {"ok": False, "txid": None, "error": "bot has no owner yet"}
-        txid = await bot.say(text)
+        if to:
+            from kachat.address import AddressError, validate_address
+            try:
+                to = validate_address(to.strip().lower(), cfg["network"], require_pubkey=True)
+            except AddressError as exc:
+                return {"ok": False, "txid": None, "error": f"bad address: {exc}"}
+            txid = await bot.send_to(to, text)
+        elif not bot.owner:
+            return {"ok": False, "txid": None, "error": "bot has no owner, and no address to send to"}
+        else:
+            txid = await bot.say(text)
         bot.store.write_status(bot.status())
         return {"ok": bool(txid), "txid": txid, "error": None if txid else (bot.error or "not sent")}
     finally:
@@ -117,6 +126,7 @@ async def sweep_direct(cfg: dict, bot_id: str, to: str) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="KaChat Bot v2 daemon")
     ap.add_argument("--send", nargs=2, metavar=("BOT_ID", "TEXT"), help="send one message to a bot's owner")
+    ap.add_argument("--to", metavar="ADDRESS", help="with --send: send it to this KaChat address instead (bots are public, without an owner)")
     ap.add_argument("--sweep", nargs=2, metavar=("BOT_ID", "TO_ADDRESS"), help="send all of a bot's funds to an address")
     args = ap.parse_args(argv)
     cfg = env_config()
@@ -136,9 +146,9 @@ def main(argv=None) -> int:
             print(json.dumps({"ok": False, "txid": None, "error": "empty message"}))
             return 1
         if daemon_alive(cfg["state_dir"]):
-            res = outbox_send(cfg["state_dir"], bot_id, text)
+            res = outbox_send(cfg["state_dir"], bot_id, text, to=args.to)
         else:
-            res = asyncio.run(send_direct(cfg, bot_id, text))
+            res = asyncio.run(send_direct(cfg, bot_id, text, to=args.to))
         print(json.dumps(res))
         return 0 if res.get("ok") else 1
 

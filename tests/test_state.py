@@ -86,10 +86,10 @@ def test_reset_owner_through_real_store(tmp_path):
     from kachat.bots import make_bot
     f = FakeCtxFactory()
     store = BotStore(str(tmp_path), "mining-1")
-    bot = make_bot(make_cfg("mining"), store, f.make())
+    bot = make_bot(make_cfg("mining"), store, f.make(), public=False)
     import asyncio
     asyncio.run(bot.handle_message(addr("11" * 32), "482915", "aa" * 32))
     assert os.path.exists(store.history_path)
-    bot2 = make_bot(make_cfg("mining", reset="r1"), store, f.make())
+    bot2 = make_bot(make_cfg("mining", reset="r1"), store, f.make(), public=False)
     assert bot2.owner is None and not os.path.exists(store.history_path)
     assert read_json(store.data_path)["resetOwnerSeen"] == "r1"

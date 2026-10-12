@@ -54,6 +54,7 @@ class Daemon:
         self.chain_poll = chain_poll
         self.watcher = ConfigWatcher(conf_path)
         self.bots: Dict[str, Bot] = {}
+        self._price_cache: Dict[str, tuple] = {}
         self.senders: Dict[str, MessageSender] = {}
         self.queues: Dict[str, asyncio.Queue] = {}
         self.workers: Dict[str, asyncio.Task] = {}
@@ -84,7 +85,8 @@ class Daemon:
 
     async def _send(self, bot: Bot, recipient: str, text: str) -> str:
         txid = await self.senders[bot.id].send(recipient, text)
-        asyncio.get_running_loop().call_later(5, lambda: asyncio.ensure_future(self._refresh_balance(bot)))
+        owner = self.bots.get(bot.id, bot)          # a public bot's person shares its host's wallet
+        asyncio.get_running_loop().call_later(5, lambda: asyncio.ensure_future(self._refresh_balance(owner)))
         return txid
 
     async def _balance(self, address: str) -> Optional[int]:
@@ -95,7 +97,14 @@ class Daemon:
             return None
 
     async def _price(self, currency: str):
-        return await asyncio.to_thread(fetch_price, currency)
+        # Every person on a public price bot polls; one fetch a minute serves them all.
+        hit = self._price_cache.get(currency)
+        if hit and time.time() - hit[0] < 60:
+            return hit[1]
+        got = await asyncio.to_thread(fetch_price, currency)
+        if got:
+            self._price_cache[currency] = (time.time(), got)
+        return got
 
     async def _hashrate(self):
         return await asyncio.to_thread(fetch_bridge_hashrate, self.bridge_url)
@@ -390,8 +399,7 @@ class Daemon:
         for r in rows:
             if r["sender"]:
                 senders.add(r["sender"])
-        if bot.owner:
-            senders.add(bot.owner)
+        senders |= bot.known_senders()
         for s in sorted(senders):
             try:
                 s = validate_address(s, self.network, require_pubkey=True)
@@ -450,11 +458,18 @@ class Daemon:
                 res["error"] = "no such bot"
             elif not bot.enabled:
                 res["error"] = "bot is disabled"
-            elif not bot.owner:
-                res["error"] = "bot has no owner yet"
+            elif not bot.owner and not req.get("to"):
+                res["error"] = "bot has no owner, and no address to send to"
             else:
-                txid = await bot.say(str(req.get("text") or ""))
-                res.update(ok=bool(txid), txid=txid, error=None if txid else (bot.error or "not sent"))
+                text = str(req.get("text") or "")
+                to = str(req.get("to") or "").strip().lower()
+                if to:
+                    try:
+                        to = validate_address(to, self.network, require_pubkey=True)
+                    except AddressError as exc:
+                        to, res["error"] = None, f"bad address: {exc}"
+                txid = (await bot.send_to(to, text) if to else None) if req.get("to") else await bot.say(text)
+                res.update(ok=bool(txid), txid=txid, error=None if txid else (res["error"] or bot.error or "not sent"))
             atomic_write_json(result_path, res)
 
     async def run(self):
@@ -548,9 +563,12 @@ def _outbox_request(state_dir: str, prefix: str, body: dict, timeout: float) -> 
     return None
 
 
-def outbox_send(state_dir: str, bot_id: str, text: str, timeout: float = 90.0) -> dict:
-    """Hands a message to the running daemon and waits for the result."""
-    res = _outbox_request(state_dir, "", {"bot": bot_id, "text": text}, timeout)
+def outbox_send(state_dir: str, bot_id: str, text: str, timeout: float = 90.0, to: Optional[str] = None) -> dict:
+    """Hands a message to the running daemon and waits for the result (to its owner, or `to`)."""
+    req = {"bot": bot_id, "text": text}
+    if to:
+        req["to"] = to
+    res = _outbox_request(state_dir, "", req, timeout)
     return res if res is not None else {"ok": False, "txid": None, "error": "the daemon did not answer in time"}
 
 

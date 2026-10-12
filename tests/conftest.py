@@ -124,8 +124,8 @@ def ctxf():
 def make_bot(ctxf):
     from kachat.bots import make_bot as mk
 
-    def _make(bot_type="mining", store=None, max_out=30, **kw):
-        return mk(make_cfg(bot_type, **kw), store or FakeStore(), ctxf.make(max_out))
+    def _make(bot_type="mining", store=None, max_out=30, public=False, **kw):
+        return mk(make_cfg(bot_type, **kw), store or FakeStore(), ctxf.make(max_out), public=public)
     return _make
 
 

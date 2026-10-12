@@ -391,7 +391,7 @@ def test_mining_without_bridge_skips_hashrate_question(ctxf):
     from kachat.bots import make_bot as mk
     ctx = ctxf.make()
     ctx.fetch_hashrate = None
-    bot = mk(make_cfg("mining"), FakeStore(), ctx)
+    bot = mk(make_cfg("mining"), FakeStore(), ctx, public=False)
     say(bot, "482915")
     assert "1/2" in texts(ctxf)[-1]
     say(bot, WATCH)

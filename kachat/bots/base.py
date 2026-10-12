@@ -263,6 +263,12 @@ class Bot:
     # False: nobody pairs with it and it has no owner (the Kaspa answers bot). It is live as soon
     # as it runs, and its history logs every conversation, each line naming the other side.
     PAIRS = True
+    # Messages one person may get per day (a public bot's people); None = no daily cap.
+    daily_cap: Optional[int] = None
+
+    def known_senders(self) -> set:
+        """Who may be writing to it outside the inbox (the indexer backfill looks them up)."""
+        return {self.owner} if self.owner else set()
 
     async def public_message(self, sender: str, text: str, now: float) -> None:
         pass
@@ -338,6 +344,20 @@ class Bot:
             self.save()
             await self._ask_about_limit()       # always the owner, whoever this was for
             return None
+        if not force and self.daily_cap:
+            day = day_key(now)
+            d = self.data.get("dayOut") or {}
+            if d.get("day") != day:
+                d = {"day": day, "n": 0, "noted": False}
+            self.data["dayOut"] = d
+            if d["n"] >= self.daily_cap:
+                if not d["noted"]:
+                    d["noted"] = True
+                    await self.send_to(recipient, f"That's my limit of {self.daily_cap} messages for you today. "
+                                                  "I'll pick up again tomorrow.", force=True)
+                self.save()
+                return None
+            d["n"] += 1
         if not force:
             self.data["outTimes"].append(now)
         try:
@@ -410,7 +430,7 @@ class Bot:
         self.save()
         await self._dispatch(text)
 
-    async def _pair(self, sender: str, text: str, txid: str, ts: int) -> None:
+    async def _pair(self, sender: str, text: str, txid: str, ts: int, intro: Optional[str] = None) -> None:
         log.info("[%s] paired with %s", self.id, sender)
         self.data["owner"] = sender
         self.data["lastInAt"] = ts
@@ -419,7 +439,7 @@ class Bot:
         self._start_setup(from_current=False)
         self.save()
         q = self.questions()
-        intro = f"Paired! I'm your KaChat {self.TITLE}. "
+        intro = intro or f"Paired! I'm your KaChat {self.TITLE}. "
         if q:
             await self.say(intro + "A few quick questions.\n\n" + self._prompt(0))
         else:
