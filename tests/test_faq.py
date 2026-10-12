@@ -19,7 +19,8 @@ def test_the_answers_file_loads():
     assert len({t.title for t in TOPICS}) == len(TOPICS)
     for t in TOPICS:
         assert t.keys, t.title
-        assert len(t.answer) <= 600, t.title          # each reply is a transaction: keep it short
+        assert len(t.answer.split("\nVideo:")[0]) <= 600, t.title   # each reply is a transaction: keep it short
+        assert len(t.answer) <= 1000, t.title
 
 
 @pytest.mark.parametrize("question,title", [
@@ -210,3 +211,15 @@ def test_learn_kaspa_answers_cite_their_article():
     assert BY_TITLE["Finality"].answer.endswith("Source: https://kaspa.com/learn-kaspa/post/finality-depth")
     cited = [t for t in TOPICS if "\nSource: https://kaspa.com/learn-kaspa" in t.answer]
     assert len(cited) == 26
+
+
+def test_how_to_answers_link_kaspa_silver_videos():
+    assert "Video: https://youtu.be/1IR7vAE6NCQ" in best_topic(TOPICS, "how do I solo mine").answer
+    assert "Video: https://youtu.be/4rBgVqUBiiw" in best_topic(TOPICS, "how do I run a node").answer
+    assert "Video: https://youtu.be/aG3HnXURnrE" in best_topic(TOPICS, "where can I buy kas").answer
+    assert best_topic(TOPICS, "is kaspa anonymous").title == "Privacy"
+    vids = [line for t in TOPICS for line in t.answer.splitlines() if line.startswith("Video: ")]
+    assert len(vids) == 41 and all(v.startswith("Video: https://youtu.be/") for v in vids)
+    # the answer comes first, then videos, then the source
+    fin = BY_TITLE["Pruning"].answer.splitlines()
+    assert fin[-1].startswith("Source: ") and fin[-2].startswith("Video: ")
