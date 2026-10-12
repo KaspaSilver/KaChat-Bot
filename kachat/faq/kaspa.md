@@ -11,7 +11,7 @@ Keep answers short: every reply is a small Kaspa transaction the bot pays for.
 
 ## What is Kaspa
 keys: what is kaspa, what's kaspa, about kaspa, explain kaspa, tell me about kaspa, kaspa coin, what is kas
-Kaspa is a proof-of-work cryptocurrency built as a blockDAG instead of a single chain. Blocks made at the same time are all kept and ordered by the GHOSTDAG protocol, so it runs at 10 blocks per second with confirmations in seconds, while staying decentralized and secured by mining like Bitcoin.
+Kaspa is a programmable P2P digital currency capable of moving value, communications, and verification at the speed of the internet with real time decentralization and censorship resistance.
 
 ## What Kaspa is for
 keys: purpose, its purpose, use case, use cases, what is it for, what's it for, what is kaspa for, why kaspa, why use kaspa, economically, economic, economics, utility, what problem, point of kaspa, value proposition
