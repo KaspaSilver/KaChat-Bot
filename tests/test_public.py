@@ -83,17 +83,15 @@ def test_price_alerts_per_person(ctxf):
     assert len(texts(ctxf, OTHER)) == before_other
 
 
-def test_thirty_messages_a_day_each_then_one_note(ctxf):
+def test_no_limit_per_person(ctxf):
     bot = host(ctxf)
-    for _ in range(40):
-        say(bot, "status", OTHER)
-    got = texts(ctxf, OTHER)
-    assert len(got) == 31 and got[-1].startswith("That's my limit of 30 messages for you today")
-    say(bot, "status", USER)                                  # someone else is not affected
-    assert len(texts(ctxf, USER)) == 1
-    ctxf.clock.t += 86400
-    say(bot, "status", OTHER)
-    assert len(texts(ctxf, OTHER)) == 32
+    start(bot, OTHER)
+    say(bot, "skip", OTHER)                                   # address needed: asked again
+    for _ in range(60):
+        say(bot, "help", OTHER)
+    assert len(texts(ctxf, OTHER)) == 63
+    assert not any("limit" in t for t in texts(ctxf, OTHER))
+    assert bot.status()["stats"]["perPersonPerDay"] is None
 
 
 def test_people_and_their_setup_survive_a_restart(ctxf, tmp_path):

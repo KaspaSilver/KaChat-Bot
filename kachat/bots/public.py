@@ -9,9 +9,9 @@ Nobody is set up before agreeing that their messages are not private (the panel 
 them): the first reply to anyone is NOT_PRIVATE_NOTICE, repeated until they answer agree. A
 person carried over from a paired bot is asked too, then continues where they were.
 
-Spending: each person gets at most `per_person_per_day` messages a day (setup replies and
-notifications together), then one note that they are done for today. There is no hourly limit
-and no limit question (nobody but the panel owns the wallet). At most MAX_PEOPLE people.
+Spending: there is no limit per person and no hourly limit (and so no limit question): every
+message is paid from the bot's wallet, and its balance is the only cap. At most MAX_PEOPLE people.
+(`per_person_per_day` can still set a daily cap per person; the daemon passes none.)
 
 The pool hashrate (the panel's own stratum bridge) is the owner's, not a stranger's, so public
 mining bots never ask about or report it.
@@ -35,7 +35,7 @@ from .base import NOT_PRIVATE_NOTICE, Bot, BotContext, is_agree
 log = logging.getLogger("kachat.bot")
 
 MAX_PEOPLE = 1000
-DEFAULT_PER_PERSON = 30          # messages one person may get per day
+DEFAULT_PER_PERSON = None        # messages one person may get per day (None = no limit)
 
 
 def person_key(address: str) -> str:
@@ -76,7 +76,7 @@ class PersonStore:
 class PublicHost(Bot):
     PAIRS = False
 
-    def __init__(self, cls, cfg, store, ctx: BotContext, per_person_per_day: int = DEFAULT_PER_PERSON):
+    def __init__(self, cls, cfg, store, ctx: BotContext, per_person_per_day: Optional[int] = DEFAULT_PER_PERSON):
         self.cls = cls
         self.TYPE = cls.TYPE
         self.TITLE = cls.TITLE

@@ -5,9 +5,8 @@ live as soon as it runs (and is funded), and anyone in KaChat can message it. Th
 in kachat/faq/kaspa.md (one topic per `##`), and a question gets the topic whose keys it
 contains most of. Nothing is generated.
 
-Spending: every reply is a transaction, so each person gets at most `perPersonPerDay` (default 30)
-answers a day (then one "that's all for today" note). It has no hourly limit: anyone may ask, so
-its wallet is the only cap on how many people it answers. How it is doing, and the questions it
+Spending: every reply is a transaction paid from its wallet. There is no limit per person and no
+hourly limit, so its wallet balance is the only cap on how much it answers. How it is doing, and the questions it
 had no answer for, show in its panel square (status "stats").
 """
 from __future__ import annotations
@@ -22,7 +21,6 @@ from .base import NOT_PRIVATE_NOTICE, Bot, Question, day_key, is_agree
 
 FAQ_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faq", "kaspa.md")
 MISSED_MAX = 20
-DEFAULT_PER_PERSON = 30          # answers one person may get per day
 GREETINGS = ("hi", "hello", "hey", "gm", "yo", "start", "menu", "help", "topics", "topic", "list", "?")
 
 
@@ -79,7 +77,7 @@ class FaqBot(Bot):
     TYPE = "faq"
     TITLE = "Kaspa answers bot"
     PUBLIC = True
-    HOURLY_LIMIT = False          # anyone may ask; the per-person daily cap is the limit
+    HOURLY_LIMIT = False          # anyone may ask, as often as they like: the wallet is the limit
     PAIRS = False                 # public: no owner, live from the start
 
     def __init__(self, *a, **kw):
@@ -109,16 +107,16 @@ class FaqBot(Bot):
         self.save()
 
     def default_settings(self) -> dict:
-        return {"perPersonPerDay": DEFAULT_PER_PERSON}
+        return {}
 
     def questions(self) -> List[Question]:
         return []
 
     def describe_settings(self) -> str:
-        return f"Answers per person per day: {self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)}"
+        return "No settings: it answers anyone, as often as they ask."
 
     def summary(self) -> str:
-        return f"Answering Kaspa questions for anyone ({self.settings.get('perPersonPerDay', DEFAULT_PER_PERSON)} a day each)"
+        return "Answering Kaspa questions for anyone"
 
     def panel_summary(self) -> str:
         if not self.enabled:
@@ -182,18 +180,15 @@ class FaqBot(Bot):
     async def public_message(self, sender: str, text: str, now: float) -> None:
         counts = self._today()["counts"]
         n = counts.get(sender, 0) + 1
-        counts[sender] = n
-        cap = int(self.settings.get("perPersonPerDay", DEFAULT_PER_PERSON))
+        counts[sender] = n                      # only for the panel's "people today"
         agreed = self.data.setdefault("agreed", {})
-        if n <= cap and sender not in agreed:
+        if sender not in agreed:
             # Nobody gets answers before agreeing that their messages are not private.
             if is_agree(text):
                 agreed[sender] = int(now)
                 await self.send_to(sender, "Thanks! " + self.topics_text())
             else:
                 await self.send_to(sender, NOT_PRIVATE_NOTICE)
-        elif n <= cap:
+        else:
             await self._reply(sender, text)
-        elif n == cap + 1:
-            await self.send_to(sender, f"That's all my answers for you today ({cap}). Ask me again tomorrow!")
         self.save()

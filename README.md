@@ -64,9 +64,8 @@ simply carries on as one of its people.
 It is public: no pairing code, no owner, no setup chat. Set it up in the panel, fund it, and it is live;
 share its address and anyone in KaChat can message it. A question gets the topic in
 [kachat/faq/kaspa.md](kachat/faq/kaspa.md) whose keys it contains most of, word for word; `topics` (or `hi`)
-lists them and a number picks one. Nothing is generated. Each person gets 30 answers a day, then one "that's
-all for today" note. It has no hourly limit (anyone may ask), so its wallet balance is the only cap on how many
-people it answers: fund it with that in mind. Its panel square shows how many it has answered, how many people
+lists them and a number picks one. Nothing is generated. There is no limit per person or per hour, so its
+wallet balance is the only cap on how much it answers: fund it with that in mind. Its panel square shows how many it has answered, how many people
 asked today, every conversation, and recent questions it had no answer for, so you know what to add. Edit the
 file and rebuild to change the answers. The on/off switch stops it; Reset starts its counts over.
 
@@ -75,11 +74,9 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
 - Nobody uses a bot before agreeing that their messages are not private: the first reply to anyone, on every
   bot (Kaspa answers too), says so and asks them to reply `agree`, and is repeated until they do. A panel Reset
   asks everyone again.
-
-- Every bot answers anyone while it is switched on. Each person gets at most 30 messages a day from a bot
-  (setup replies and notifications together, then one "that's my limit for today" note), and at most 1,000
-  people can use one bot. There is no hourly limit, so a bot's wallet balance is what caps its spending:
-  keep only a few KAS in it.
+- Every bot answers anyone while it is switched on, with no limit per person or per hour (at most 1,000
+  people can use one bot). Its wallet balance is the only cap on its spending: keep only a few KAS in it.
+  (Each message someone sends it costs them a network fee too, about what the bot's reply costs.)
 - A bot never sends KAS anywhere but back to itself, except when the panel's *Send to wallet* empties it.
 - `botd.py --send <bot> "<text>" --to <address>` sends one message to an address (the panel's alerts; bots
   have no owner to send to any more).

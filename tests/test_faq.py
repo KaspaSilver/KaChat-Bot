@@ -110,26 +110,20 @@ def test_switched_off_answers_nobody(make_bot, ctxf):
     assert texts(ctxf, OTHER) == []
 
 
-def test_daily_cap_per_person(make_bot, ctxf):
+def test_no_limit_per_person(make_bot, ctxf):
     bot = live(make_bot, ctxf)
-    bot.data["settings"]["perPersonPerDay"] = 3
-    for _ in range(6):
+    agreed(bot, ctxf, OTHER)
+    for _ in range(60):
         say(bot, "what is kaspa", OTHER)
     got = texts(ctxf, OTHER)
-    assert len(got) == 4 and got[-1].startswith("That's all my answers for you today (3)")
-    say(bot, "what is kaspa", THIRD)                     # someone else still gets one
-    assert len(texts(ctxf, THIRD)) == 1
-    ctxf.clock.t += 86400
-    say(bot, "what is kaspa", OTHER)
-    assert len(texts(ctxf, OTHER)) == 5
+    assert len(got) == 60 and all(t == BY_TITLE["What is Kaspa"].answer for t in got)
 
 
-def test_default_is_thirty_a_day(make_bot, ctxf):
+def test_people_today_still_counted_for_the_panel(make_bot, ctxf):
     bot = live(make_bot, ctxf)
-    for _ in range(32):
-        say(bot, "what is kaspa", OTHER)
-    got = texts(ctxf, OTHER)
-    assert len(got) == 31 and got[-1].startswith("That's all my answers for you today (30)")
+    say(bot, "hi", OTHER)
+    say(bot, "hi", THIRD)
+    assert bot.status()["stats"]["peopleToday"] == 2
 
 
 def test_missed_questions_and_history_show_in_the_panel(make_bot, ctxf):
