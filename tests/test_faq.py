@@ -176,3 +176,31 @@ def test_greetings_small_talk_and_other_languages(make_bot, ctxf, text, start):
     bot = live(make_bot, ctxf)
     reply, _ = bot.reply_for(text)
     assert reply.startswith(start)
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is the finality depth", "Finality"),
+    ("can a transaction be reversed after 12 hours", "Finality"),
+    ("how many blocks per day", "Blocks per day"),
+    ("what is the bitcoin scaling problem", "The Bitcoin scaling problem"),
+    ("what are red blocks", "Blue and red blocks"),
+    ("what is blue score", "Blue score and blue work"),
+    ("what is the k parameter", "The k parameter"),
+    ("what is the virtual block", "Virtual block"),
+    ("what is toccata", "Toccata hard fork"),
+    ("why is the fee so high for tiny amounts", "Storage mass (KIP-9)"),
+    ("what is KIP-9", "Storage mass (KIP-9)"),
+    ("how big is a block", "Block mass limit"),
+    ("what are covenants", "Covenants"),
+    ("what does KIP-10 do", "KIP-10"),
+    ("what is KIP-21", "KIP-21"),
+    ("what is SilverScript", "SilverScript"),
+    ("does kaspa support multisig", "Kaspa Script and opcodes"),
+    ("how long does it take a new node to sync", "How a new node syncs"),
+    ("what is in a block header", "Inside a block"),
+    ("can miners fake a timestamp", "Block timestamps"),
+    ("where can I learn more", "Learn more"),
+    ("how much history does a node keep", "Pruning"),
+])
+def test_learn_kaspa_topics(question, title):
+    assert best_topic(TOPICS, question).title == title
