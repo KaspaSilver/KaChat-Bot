@@ -8,6 +8,7 @@ import rpc_pb2
 from conftest import BOT_KEY, OTHER_KEY, USER_KEY, FakeBackend, addr
 
 from kachat.address import script_for_address, short_address
+from kachat.bots.base import NOT_PRIVATE_NOTICE
 from kachat.alias import send_alias, watch_alias
 from kachat.chain import ChainFollower, chain_tx_from_pb, is_chat_payload_hex
 from kachat.crypto import open_sealed
@@ -163,11 +164,15 @@ def test_daemon_pairs_over_chain_and_replies_on_users_alias(tmp_path):
         ])]
         await f.step("aa" * 32)
         await _settle()
-        assert bot.owner is None and bot.people[USER].owner == USER      # public: no pairing
         alias, text = replies(be)[-1]
         assert alias == watch_alias(USER_KEY, BOT) == send_alias(BOT_KEY, USER)
-        assert text.startswith("Hi! I'm the KaChat Mining bot")
+        assert text == NOT_PRIVATE_NOTICE                                  # public: no pairing, agree first
         # later messages are plain comm on the user's send alias
+        node.responses = [vspc([make_tx(user_msg("agree"), USER)])]
+        await f.step("ab" * 32)
+        await _settle()
+        assert bot.owner is None and bot.people[USER].owner == USER
+        assert replies(be)[-1][1].startswith("Thanks! I'm the KaChat Mining bot")
         node.responses = [vspc([make_tx(user_msg(addr("44" * 32)), USER)])]
         await f.step("bb" * 32)
         await _settle()
@@ -178,7 +183,7 @@ def test_daemon_pairs_over_chain_and_replies_on_users_alias(tmp_path):
         assert st["stats"]["people"] >= 1
         hist = [json.loads(h) for h in (tmp_path / "state" / "bots" / "mining-1.history.jsonl").read_text().splitlines()]
         mine = [h for h in hist if short_address(USER) in h["text"]]
-        assert [h["dir"] for h in mine] == ["in", "out", "in", "out"]
+        assert [h["dir"] for h in mine] == ["in", "out", "in", "out", "in", "out"]
         # the person's conversation is its own file next to the bot's
         assert os.listdir(tmp_path / "state" / "botd" / "mining-1")
         for t in d.workers.values():
@@ -224,14 +229,14 @@ def test_indexer_backfill_fills_gaps(tmp_path):
         nonlocal d
         d, node, be = make_daemon(tmp_path)
         d.reload_config()
-        d.indexer = FakeIndexer([row("f1" * 32, "482915", True), row("f2" * 32, "kaspa:bad")])
+        d.indexer = FakeIndexer([row("f1" * 32, "482915", True), row("f0" * 32, "agree"), row("f2" * 32, "kaspa:bad")])
         await d.backfill(d.bots["mining-1"])
         await _settle()
         assert d.bots["mining-1"].people[USER].owner == USER
-        assert len(be.submitted) == 2 and "doesn't look right" in replies(be)[-1][1]
+        assert len(be.submitted) == 3 and "doesn't look right" in replies(be)[-1][1]
         await d.backfill(d.bots["mining-1"])          # same rows: nothing new
         await _settle()
-        assert len(be.submitted) == 2
+        assert len(be.submitted) == 3
         assert d.bots["mining-1"].data["indexerCursorMs"] > 0
         for t in d.workers.values():
             t.cancel()

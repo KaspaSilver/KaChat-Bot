@@ -26,8 +26,10 @@ One container runs any number of bots. It is normally deployed and driven by the
    shows the bot's address.
 2. **Fund the address.** Send the bot a few KAS (1 KAS is hundreds of messages). It pays for every message it
    sends to everyone, so keep an eye on its balance. The square shows when it is funded.
-3. **Share its address.** Anyone who messages it in KaChat (you too) gets a greeting and its setup questions,
-   one at a time; send `skip` to keep a default. Each person's settings are their own.
+3. **Share its address.** Anyone who messages it in KaChat (you too) is first told that **messages sent to the bot
+   are not private** (they are encrypted on the way, but whoever runs the bot can read them) and must reply
+   `agree` before anything else. Then they get its setup questions, one at a time; send `skip` to keep a
+   default. Each person's settings are their own.
 
 *Reset* in the panel forgets everyone's setup (each person starts over the next time they message); the
 wallet and its KAS stay. A bot that was paired before bots went public keeps its owner's setup: that person
@@ -69,6 +71,10 @@ asked today, every conversation, and recent questions it had no answer for, so y
 file and rebuild to change the answers. The on/off switch stops it; Reset starts its counts over.
 
 ### Safety
+
+- Nobody uses a bot before agreeing that their messages are not private: the first reply to anyone, on every
+  bot (Kaspa answers too), says so and asks them to reply `agree`, and is repeated until they do. A panel Reset
+  asks everyone again.
 
 - Every bot answers anyone while it is switched on. Each person gets at most 30 messages a day from a bot
   (setup replies and notifications together, then one "that's my limit for today" note), and at most 1,000

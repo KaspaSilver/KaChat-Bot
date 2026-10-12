@@ -5,6 +5,10 @@ private conversation per person who messages it: an ordinary bot of that type wh
 that person, so setup, commands, `add`, `reset` and notifications all work exactly as for a
 paired bot, just for everyone at once. They all share the host's wallet (it pays every message).
 
+Nobody is set up before agreeing that their messages are not private (the panel owner can read
+them): the first reply to anyone is NOT_PRIVATE_NOTICE, repeated until they answer agree. A
+person carried over from a paired bot is asked too, then continues where they were.
+
 Spending: each person gets at most `per_person_per_day` messages a day (setup replies and
 notifications together), then one note that they are done for today. There is no hourly limit
 and no limit question (nobody but the panel owns the wallet). At most MAX_PEOPLE people.
@@ -26,7 +30,7 @@ from typing import Dict, Optional
 
 from ..address import short_address
 from ..state import atomic_write_json, read_json
-from .base import Bot, BotContext
+from .base import NOT_PRIVATE_NOTICE, Bot, BotContext, is_agree
 
 log = logging.getLogger("kachat.bot")
 
@@ -198,10 +202,30 @@ class PublicHost(Bot):
         self.save()
         if p is None:
             return
-        if p.owner is None:
+        if not p.data.get("agreedNotPrivate"):
+            await self._agreement(p, sender, text, txid, ts)
+        elif p.owner is None:
             await p._pair(sender, text, txid, ts, intro=f"Hi! I'm the KaChat {self.TITLE}. ")
         else:
             await p.handle_message(sender, text, txid, ts)
+
+    async def _agreement(self, p: Bot, sender: str, text: str, txid: str, ts: int) -> None:
+        """Before anything else: the person agrees that their messages are not private."""
+        p.mark_seen(txid)
+        if not is_agree(text):
+            p.store.append_history("in", text, txid, ts)
+            sent = await p.send_to(sender, NOT_PRIVATE_NOTICE)
+            if sent and p.owner != sender:
+                p.store.append_history("out", NOT_PRIVATE_NOTICE, sent, ts)
+            p.save()
+            return
+        p.data["agreedNotPrivate"] = int(ts)
+        p.save()
+        if p.owner is None:
+            await p._pair(sender, text, txid, ts, intro=f"Thanks! I'm the KaChat {self.TITLE}. ")
+        else:
+            p.store.append_history("in", text, txid, ts)
+            await p.say("Thanks! Carry on where you left off. Send help for the commands.")
 
     async def send_pending_greeting(self) -> None:
         for p in list(self.people.values()):

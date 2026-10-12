@@ -35,6 +35,17 @@ PRIVATE_REPLIES_PER_DAY = 20
 DEFAULT_MAX_OUT_PER_HOUR = 50
 REQUIRED = object()
 
+# Bots are public and whoever runs one can read what it receives (its history), so nobody uses a
+# bot before agreeing to that. Sent first to everyone, again until they agree.
+NOT_PRIVATE_NOTICE = ("Before we start: messages you send to this bot are not private. They are encrypted on "
+                      "the way, but whoever runs this bot can read them. Reply agree to continue.")
+AGREE_WORDS = ("agree", "i agree", "yes", "y", "ok", "okay", "accept", "i accept", "agreed")
+
+
+def is_agree(text: str) -> bool:
+    return (text or "").strip().lower().strip(".!").strip() in AGREE_WORDS
+
+
 YES_NO = {"yes": True, "y": True, "yeah": True, "ok": True, "no": False, "n": False, "nope": False}
 COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
 MAX_WATCHED = 10                 # addresses one mining or wallet bot may watch

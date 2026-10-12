@@ -2,6 +2,7 @@
 import pytest
 from conftest import OTHER_KEY, USER_KEY, addr, make_cfg
 
+from kachat.bots.base import NOT_PRIVATE_NOTICE
 from kachat.bots.faq import best_topic, load_topics
 from test_engine import say, texts
 
@@ -58,6 +59,23 @@ def live(make_bot, ctxf, **kw):
     return bot
 
 
+def agreed(bot, ctxf, *who):
+    for w in who:
+        say(bot, "agree", w)
+    ctxf.sent.clear()
+    bot.data["askers"] = {"day": "", "counts": {}}       # the agreeing does not count here
+
+
+def test_answers_only_after_agreeing_messages_are_not_private(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    say(bot, "what is the max supply?", OTHER)
+    assert texts(ctxf, OTHER) == [NOT_PRIVATE_NOTICE]
+    say(bot, "agree", OTHER)
+    assert texts(ctxf, OTHER)[-1].startswith("Thanks! I answer common Kaspa questions")
+    say(bot, "what is the max supply?", OTHER)
+    assert texts(ctxf, OTHER)[-1] == BY_TITLE["Max supply"].answer
+
+
 def test_live_from_the_start_with_no_owner(make_bot, ctxf):
     bot = live(make_bot, ctxf)
     assert bot.stage == "active" and bot.owner is None
@@ -68,6 +86,7 @@ def test_live_from_the_start_with_no_owner(make_bot, ctxf):
 
 def test_anyone_gets_answers(make_bot, ctxf):
     bot = live(make_bot, ctxf)
+    agreed(bot, ctxf, OTHER)
     say(bot, "what is the max supply?", OTHER)
     assert texts(ctxf, OTHER) == [BY_TITLE["Max supply"].answer]
     say(bot, "hi", OTHER)
@@ -81,7 +100,7 @@ def test_the_pairing_code_is_just_a_question(make_bot, ctxf):
     bot = live(make_bot, ctxf)
     say(bot, "482915", USER)
     assert bot.owner is None and bot.stage == "active"
-    assert texts(ctxf, USER) and "private" not in texts(ctxf, USER)[0]
+    assert texts(ctxf, USER) == [NOT_PRIVATE_NOTICE]
 
 
 def test_switched_off_answers_nobody(make_bot, ctxf):
@@ -115,6 +134,8 @@ def test_default_is_thirty_a_day(make_bot, ctxf):
 
 def test_missed_questions_and_history_show_in_the_panel(make_bot, ctxf):
     bot = live(make_bot, ctxf)
+    agreed(bot, ctxf, OTHER)
+    bot.store.history.clear()
     say(bot, "flibbertigibbet", OTHER)
     assert bot.status()["stats"]["missed"] == ["flibbertigibbet"]
     lines = [(h["dir"], h["text"]) for h in bot.store.history]

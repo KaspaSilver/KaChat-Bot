@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from ..address import short_address
-from .base import Bot, Question, day_key
+from .base import NOT_PRIVATE_NOTICE, Bot, Question, day_key, is_agree
 
 FAQ_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faq", "kaspa.md")
 MISSED_MAX = 20
@@ -103,7 +103,8 @@ class FaqBot(Bot):
         # The panel's Reset: start the counts and the missed list over (there are no answers to forget).
         rs = getattr(cfg, "reset_settings", None)
         if rs and rs != self.data.get("faqResetSeen"):
-            self.data.update({"faqResetSeen": rs, "askers": {"day": "", "counts": {}}, "answered": 0, "missed": []})
+            self.data.update({"faqResetSeen": rs, "askers": {"day": "", "counts": {}}, "answered": 0, "missed": [],
+                              "agreed": {}})
         self._go_live()
         self.save()
 
@@ -183,7 +184,15 @@ class FaqBot(Bot):
         n = counts.get(sender, 0) + 1
         counts[sender] = n
         cap = int(self.settings.get("perPersonPerDay", DEFAULT_PER_PERSON))
-        if n <= cap:
+        agreed = self.data.setdefault("agreed", {})
+        if n <= cap and sender not in agreed:
+            # Nobody gets answers before agreeing that their messages are not private.
+            if is_agree(text):
+                agreed[sender] = int(now)
+                await self.send_to(sender, "Thanks! " + self.topics_text())
+            else:
+                await self.send_to(sender, NOT_PRIVATE_NOTICE)
+        elif n <= cap:
             await self._reply(sender, text)
         elif n == cap + 1:
             await self.send_to(sender, f"That's all my answers for you today ({cap}). Ask me again tomorrow!")
