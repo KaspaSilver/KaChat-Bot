@@ -231,7 +231,21 @@ class PublicHost(Bot):
         for p in list(self.people.values()):
             await p.send_pending_greeting()
 
+    def low_balance_people(self, now: float) -> list:
+        recent = [p for p in self.people.values()
+                  if p.owner and p.data.get("agreedNotPrivate") and now - (p.data.get("lastInAt") or 0) < self.LOW_BALANCE_RECENT]
+        recent.sort(key=lambda p: p.data.get("lastInAt") or 0, reverse=True)
+        return [p.owner for p in recent]
+
+    async def send_low_balance_notice(self, recipient: str, text: str):
+        p = self.people.get(recipient)
+        return await (p.send_to(recipient, text) if p else self.send_to(recipient, text))
+
     async def tick(self, now: float) -> None:
+        try:
+            await self.check_low_balance(now)
+        except Exception:
+            log.exception("[%s] low-balance notice failed", self.id)
         for p in list(self.people.values()):
             try:
                 await p.tick(now)

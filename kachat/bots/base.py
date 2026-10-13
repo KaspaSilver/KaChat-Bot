@@ -272,6 +272,51 @@ class Bot:
 
     # A public bot also answers people other than its owner (public_message).
     PUBLIC = False
+
+    # ── low balance: ask the people who use it to chip in ──────────────────
+    LOW_BALANCE_SOMPI = 50_000_000         # 0.5 KAS: below this, tell its people (once)
+    REARM_BALANCE_SOMPI = 100_000_000      # 1 KAS: back above this, it may ask again later
+    CONTRIBUTE_SOMPI = 500_000_000         # the payment request asks for 5 KAS
+    LOW_BALANCE_RECIPIENTS = 50            # the most recent people it tells
+    LOW_BALANCE_RECENT = 30 * 86400        # people who used it within 30 days
+
+    def low_balance_people(self, now: float) -> List[str]:
+        """Who to tell its balance is low: (override) the people who use it, most recent first."""
+        return [self.owner] if self.owner else []
+
+    def low_balance_text(self) -> str:
+        from ..payreq import payment_request_link
+        link = payment_request_link(self.address, self.CONTRIBUTE_SOMPI, f"Keep the KaChat {self.TITLE} running",
+                                    self.priv_hex)
+        return (f"My wallet balance is low ({fmt_kas(self.balance)} left), and every message I send is paid from it. "
+                f"If you'd like to contribute to keep me running, tap here to send KAS:\n{link}")
+
+    async def send_low_balance_notice(self, recipient: str, text: str) -> Optional[str]:
+        return await self.send_to(recipient, text)
+
+    async def check_low_balance(self, now: float) -> None:
+        """Once each time its balance falls below 0.5 KAS: a message with a KaChat payment request
+        link (tap it and Send Kaspa opens, filled in) to the people who use it."""
+        state = self.data.setdefault("lowBalance", {"armed": True})
+        bal = self.balance
+        if bal is None:
+            return
+        if bal >= self.REARM_BALANCE_SOMPI:
+            if not state.get("armed"):
+                state["armed"] = True
+                self.save()
+            return
+        if not state.get("armed") or bal >= self.LOW_BALANCE_SOMPI or bal <= 0:
+            return
+        people = self.low_balance_people(now)[: self.LOW_BALANCE_RECIPIENTS]
+        state.update(armed=False, sentAt=int(now), told=len(people))
+        self.save()
+        if not people:
+            return
+        log.info("[%s] balance low (%s): telling %d people", self.id, fmt_kas(bal), len(people))
+        text = self.low_balance_text()
+        for who in people:
+            await self.send_low_balance_notice(who, text)
     # The hourly message limit (max_out_per_hour). The Kaspa answers bot turns it off: anyone may
     # ask it, and it caps each person per day instead.
     HOURLY_LIMIT = True

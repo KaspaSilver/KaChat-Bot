@@ -272,10 +272,24 @@ class FaqBot(Bot):
             self.data["answered"] = int(self.data.get("answered", 0)) + 1
         self.save()
 
+    def low_balance_people(self, now: float) -> list:
+        agreed = self.data.get("agreed") or {}
+        seen = self.data.get("lastSeen") or {}
+        recent = [(t, who) for who, t in seen.items() if who in agreed and now - t < self.LOW_BALANCE_RECENT]
+        return [who for t, who in sorted(recent, reverse=True)]
+
+    async def tick(self, now: float) -> None:
+        await self.check_low_balance(now)
+
     async def public_message(self, sender: str, text: str, now: float) -> None:
         counts = self._today()["counts"]
         n = counts.get(sender, 0) + 1
         counts[sender] = n                      # only for the panel's "people today"
+        seen = self.data.setdefault("lastSeen", {})
+        seen.pop(sender, None)
+        seen[sender] = int(now)                 # most recent last, for the low-balance notice
+        while len(seen) > 2000:
+            seen.pop(next(iter(seen)))
         agreed = self.data.setdefault("agreed", {})
         if sender not in agreed:
             # Nobody gets answers before agreeing that their messages are not private.

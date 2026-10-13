@@ -81,6 +81,10 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
   exchange's gets payments all the time) is dropped automatically: more than 5 payments in a minute, or more than
   20 in 10 minutes, and the mining or wallet bot stops watching it and tells the person to choose an address that
   does not have this much activity. If it was their only address, setup starts over.
+- When a bot's balance falls below 0.5 KAS it tells the people who use it, once (up to the 50 most recent who
+  used it in the last 30 days and agreed to the notice), that its wallet is low, with a KaChat payment request link
+  (`https://kachat.app/pay/...`, 5 KAS, signed with the bot's key) that opens Send Kaspa in KaChat filled in. It
+  asks again only after its balance has been back above 1 KAS.
 - A bot never sends KAS anywhere but back to itself, except when the panel's *Send to wallet* empties it.
 - `botd.py --send <bot> "<text>" --to <address>` sends one message to an address (the panel's alerts; bots
   have no owner to send to any more).
