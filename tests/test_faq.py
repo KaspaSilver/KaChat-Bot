@@ -219,7 +219,7 @@ def test_how_to_answers_link_kaspa_silver_videos():
     assert "Video: https://youtu.be/aG3HnXURnrE" in best_topic(TOPICS, "where can I buy kas").answer
     assert best_topic(TOPICS, "is kaspa anonymous").title == "Privacy"
     vids = [line for t in TOPICS for line in t.answer.splitlines() if line.startswith("Video: ")]
-    assert len(vids) == 42 and all(v.startswith("Video: https://youtu.be/") for v in vids)
+    assert len(vids) == 43 and all(v.startswith("Video: https://youtu.be/") for v in vids)
     # the answer comes first, then videos, then the source
     fin = BY_TITLE["Pruning"].answer.splitlines()
     assert fin[-1].startswith("Source: ") and fin[-2].startswith("Video: ")
@@ -333,3 +333,30 @@ def test_a_new_question_after_the_follow_up_is_answered_normally(make_bot, ctxf)
 ])
 def test_hard_fork_questions(question, title):
     assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is a KCC", "KCCs"),
+    ("what is KCC-20", "KCC-20 tokens"),
+    ("kcc20 vs krc20", "KCC-20 tokens"),
+    ("can I convert krc20 to kcc20", "KRC-20 to KCC-20"),
+    ("is there a stablecoin on kaspa", "Stablecoins"),
+    ("can AI agents pay with kaspa", "Payments for APIs and AI agents (x402)"),
+    ("what is x402", "Payments for APIs and AI agents (x402)"),
+    ("can kaspa verify zk proofs", "Zero-knowledge proofs"),
+    ("what is kas smiths", "Kas-Smiths forum"),
+    ("why does my covenant address change", "Covenant ID"),
+    ("how do tokens get a ticker and logo", "Token metadata"),
+    ("is there a browser wallet api", "Browser wallet standard (KCC-12)"),
+    ("are there prediction markets on kaspa", "Prediction markets"),
+    ("my covenant tokens are not showing", "Finding covenant tokens"),
+    ("is toccata live", "Toccata hard fork"),
+])
+def test_kas_smiths_topics(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+def test_forum_answers_cite_their_thread():
+    cited = [t for t in TOPICS if "\nSource: https://kas-smiths.org/t/" in t.answer]
+    assert len(cited) == 14
+    assert "testnet-10 only" in BY_TITLE["Stablecoins"].answer

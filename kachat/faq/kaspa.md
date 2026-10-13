@@ -133,7 +133,7 @@ Video: https://youtu.be/GnfYuK7rn24 (Kaspa Crescendo Update: Everything You Need
 
 ## Toccata hard fork
 keys: toccata, covenant hard fork, covenants hard fork, next hard fork, kip 17, kip17
-Toccata is the hard fork that brings covenants to Kaspa: richer transaction introspection (KIP-17), consensus-tracked covenant IDs (KIP-20) and room for zero-knowledge proof checks. The newest Kaspa learning material places its activation around DAA score 474 million (mid-2026). Check kaspa.org for the current details.
+Toccata is the hard fork that brought covenants to Kaspa's base layer in mid-2026 (around DAA score 474 million): richer transaction introspection (KIP-17), consensus-tracked covenant IDs (KIP-20), a new transaction version with a compute budget (KIP-24), and on-chain checks of zero-knowledge proofs (Groth16 and RISC Zero). Builders now write covenants in SilverScript.
 Video: https://youtu.be/Vew-_zOQcQ4 (A New Hard Fork For Kaspa Incoming!)
 Source: https://kaspa.com/learn-kaspa/post/dag-and-kaspa
 
@@ -207,7 +207,7 @@ Video: https://youtu.be/nPm6MxvGAFc (Hot Wallet vs. Cold Storage)
 
 ## Privacy
 keys: privacy, private, anonymous, anonymity, untraceable, traceable, privacy coin, hide transactions, can people see my balance
-Kaspa is not a privacy coin: like Bitcoin, every address, amount and transaction is public on the chain, and anyone who knows your address can see its balance. To keep more privacy, use a new address for each payment, don't link your addresses to your identity, and run your own node so your wallet doesn't ask someone else's server about your addresses.
+Kaspa is not a privacy coin: like Bitcoin, every address, amount and transaction is public on the chain, and anyone who knows your address can see its balance. To keep more privacy, use a new address for each payment, don't link your addresses to your identity, and run your own node so your wallet doesn't ask someone else's server about your addresses. Optional privacy for KAS is being researched (the Kaspa Privacy Initiative), but nothing is built yet.
 Video: https://youtu.be/8LNLlgUurSY (Increasing Your Privacy While Using Kaspa)
 
 ## Scams
@@ -237,15 +237,76 @@ I don't give investment advice or price predictions. Only invest what you can af
 
 ## Smart contracts
 keys: smart contract, smart contracts, contracts, evm, programmability, defi, vprogs, layer 2, layer two, l2, rollup, rollups, igra, kasplex l2
-Kaspa programmability comes in layers. Its script language already does multisig, timelocks and escrow, and Crescendo (May 2025) let scripts inspect the transaction (KIP-10). Covenants add rules about where coins can go next (KIP-17/KIP-20, the Toccata hard fork). Layer-2s like Kasplex L2 and Igra bring EVM contracts that settle on Kaspa, and native "vProgs" are in research. Send covenants, KIP-10 or SilverScript for more.
+Kaspa programmability comes in layers. Its script language already does multisig, timelocks and escrow, and Crescendo (May 2025) let scripts inspect the transaction (KIP-10). Covenants, live since the Toccata hard fork (mid-2026), add rules about where coins can go next, and token standards for them (KCCs) are being drafted. Layer-2s like Kasplex L2 and Igra bring EVM contracts that settle on Kaspa, and native "vProgs" are in research. Send covenants, KIP-10 or SilverScript for more.
 Video: https://youtu.be/_8l6XBDu-wQ (What Are Smart Contracts? Does Kaspa Need Them?)
 Video: https://youtu.be/qMRcf1HVQBA (Overview of Kasplex's L2 Smart Contracts)
 Source: https://kaspa.com/learn-kaspa/post/smart-contracts
 
+## Stablecoins
+keys: stablecoin, stablecoins, stable coin, stable coins, kusd, usd on kaspa, dollar on kaspa, kas backed stablecoin
+On Kaspa's base layer, KUSD is an experimental stablecoin backed by locked KAS with no price oracle (modelled on Frankencoin), written as covenants. It runs on testnet-10 only, is unaudited, and is not meant for real money.
+Source: https://kas-smiths.org/t/kusd-a-decentralized-oracle-free-kas-backed-stablecoin-on-l1/143
+
+## Payments for APIs and AI agents (x402)
+keys: x402, 402, payment required, ai agent, ai agents, pay per request, api payments, machine payments, micropayments
+Kaspa x402 adds KAS to x402, the open "HTTP 402 Payment Required" standard, so APIs and AI agents can charge per request: a one-off KAS payment (about 0.1 KAS minimum), or a covenant escrow with cheap signed vouchers for tiny repeated payments. It reached v1.0.0-rc.1 in September 2026 and is testnet-10 only until audited. More at kaspa-x402.org.
+Source: https://kas-smiths.org/t/kaspa-x402-pay-per-request-kas-payments-for-apis-and-ai-agents/15
+
+## Prediction markets
+keys: prediction market, prediction markets, betting, polymarket, bet on, yes no market
+A permissionless prediction-market design for Kaspa covenants has been sketched: anyone opens a yes/no market, YES and NO tokens are always minted in pairs, and holders vote on the outcome, with incentives that reward honest votes. It is a paper and an idea; nothing is live.
+Source: https://kas-smiths.org/t/permissionless-covenant-based-prediction-markets-high-level-sketch/57
+
+## Reputation, bonds and identity
+keys: reputation, on chain reputation, bond, bonds, slashable bond, slashing, identity registry, deed
+Three draft covenant conventions give Kaspa an on-chain reputation record (good and bad marks that only go up), a slashable bond that pays the buyer if a referee rules against the worker, and a registry for unforgeable identities. They work end to end on testnet-10; the KCCs are drafts, not merged.
+Source: https://kas-smiths.org/t/three-covenant-kccs-for-reputation-bonds-and-identity-live-on-testnet-10/148
+
 ## Covenants
-keys: covenant, covenants, covenant id, kip 20, kip20, native tokens, native assets, bridge, bridges
-A covenant is a coin with rules about where it may go next, checked by every node. Kaspa covenants (Toccata hard fork: KIP-17 introspection and KIP-20 covenant IDs) let coins carry a stable identity across transactions, which enables native tokens enforced by consensus, payment channels, vaults and the building blocks for trustless bridges to layer-2s.
+keys: covenant, covenants, kip 20, kip20, native tokens, native assets, bridge, bridges
+A covenant is a coin with rules about where it may go next, checked by every node. Kaspa covenants, live since the Toccata hard fork (KIP-17 introspection and KIP-20 covenant IDs), let coins carry a stable identity across transactions, which enables native tokens enforced by consensus, payment channels, vaults and the building blocks for trustless bridges to layer-2s.
 Source: https://kaspa.com/learn-kaspa/post/kip-20
+
+## Covenant ID
+keys: covenant id, covenant identity, covenant address changes, why does my covenant address change, covenant lineage
+A covenant's address changes every time its state changes, because the address is a hash of its script and the state is part of that script. A covenant ID (KIP-20) is the stable identity that follows it across those changes, so wallets and explorers can recognise the same covenant or token over time.
+Source: https://kas-smiths.org/t/a-path-towards-universal-covenant/41
+
+## KCCs
+keys: kcc, kccs, kaspa call for conventions, kaspa calls for conventions, kcc vs kip, convention, conventions, standard, standards, token standard
+KCC stands for Kaspa Call for Conventions: shared standards that wallets, indexers and apps agree to follow, such as token formats and covenant ABIs. Unlike KIPs, they change nothing in consensus. They live at github.com/kaspanet/kccs, start as Draft, and need security notes and test vectors before Review and Final. KCC-1 (covenants), KCC-2 (ownership) and KCC-20 (tokens) are Drafts.
+Source: https://kas-smiths.org/t/kaspa-calls-for-conventions-new-kcc-repo/84
+
+## KCC-20 tokens
+keys: kcc20, kcc 20, kcc-20, covenant token, covenant tokens, kcc20 vs krc20, native token standard, erc20
+KCC-20 is the draft standard for tokens built as covenants on Kaspa itself, a bit like ERC-20 but each balance is its own coin (UTXO). Unlike KRC-20, every node enforces the rules, not an indexer, and a token can even be owned by another covenant. It was merged as a Draft in August 2026; builders use its reference contract on testnet-10, and some launchpads deployed tokens on earlier draft versions.
+Source: https://kas-smiths.org/t/fungible-token-covenant-specification-kcc20/8
+
+## KCC-1 and KCC-2
+keys: kcc1, kcc 1, kcc-1, kcc01, kcc2, kcc 2, kcc-2, kcc02, program abi, covenant abi, control principal, who owns a covenant
+KCC-1 defines what a covenant is and how its calls and state are encoded (its "program ABI"), so any tool can read any covenant. KCC-2 defines how a covenant records who controls it (an owner key, another covenant, ...), so a wallet can find what belongs to you. Both are Drafts, with review comments still open.
+Source: https://kas-smiths.org/t/kcc-02-control-principal-references-in-program-abis/95
+
+## Token metadata
+keys: token metadata, token name, ticker, token logo, kcc21, kcc 21, kcc-21, kcc23, kcc 23, kcc-23, metadata json
+Covenant tokens get their name, ticker, decimals and logo from metadata conventions: KCC-21 (JSON in the token's first transaction) and KCC-23 (JSON tied to the covenant ID, still provable after pruning). Both are proposals under review. Tickers aren't unique: the covenant ID is a token's real identity.
+Source: https://kas-smiths.org/t/kcc-23-convention-for-binding-covenant-metadata-to-a-covenant-id/150
+
+## KRC-20 to KCC-20
+keys: convert krc20, krc20 to kcc20, krc-20 to kcc-20, migrate tokens, bridge krc20, move krc20
+There is no trustless way to turn KRC-20 tokens into KCC-20 covenant tokens: KRC-20 balances live in the Kasplex indexer, which covenants can't see or verify, so any bridge needs someone to trust. It has been explored on the forum, but nothing is built.
+Source: https://kas-smiths.org/t/exploring-a-trust-minimized-krc-20-to-kcc-20-bridge-on-kaspa-without-relying-on-a-relayer/126
+
+## Zero-knowledge proofs
+keys: zk, zero knowledge, zero-knowledge, zk proof, zk proofs, groth16, risc zero, risc0, zk verify, verify proofs
+Since Toccata, Kaspa covenants can check zero-knowledge proofs on-chain: Groth16 (small and cheap, but each circuit needs its own trusted setup) and RISC Zero (no setup, but a single check fills about half a block). A proof-gated covenant was demonstrated on mainnet in September 2026. ZK is also the path to trustless bridges and layer-2s.
+Video: https://youtu.be/Wtm-3FjdB3I (What Are ZK-Proofs And What Do They Bring To Kaspa)
+Source: https://kas-smiths.org/t/proof-gated-covenant-ownership-of-kcc20-state-worked-profile-tn10-receipts/140
+
+## Finding covenant tokens
+keys: kascov, covenant explorer, find my covenant tokens, my tokens are not showing, tokens are not showing, tokens not showing, token not showing, covenant utxos, getutxosbycovenantid, token explorer
+A Kaspa node can't yet list all coins of a covenant; that is planned after a rework of its UTXO index. Until then, wallets and apps use indexers: the kascov explorer shows covenant tokens per address and each token's history on mainnet and testnet-10.
+Source: https://kas-smiths.org/t/wallet-utxo-covenant-id-lookup/142
 
 ## KIP-10
 keys: kip 10, kip10, kip-10, introspection, transaction introspection, 8 byte, 64 bit
@@ -269,6 +330,11 @@ keys: script, kaspa script, opcode, opcodes, multisig, multi sig, timelock, time
 Kaspa Script is a small stack language like Bitcoin's: every coin has a lock (a script) and spending it needs the matching key. It supports Schnorr and ECDSA signatures, M-of-N multisig, timelocks and script-hash (P2SH) addresses, with limits that keep validation fast. A tip: a timelock branch must still require a signature, or anyone can spend after the time passes.
 Source: https://kaspa.com/learn-kaspa/post/opcodes
 
+## Browser wallet standard (KCC-12)
+keys: kcc12, kcc 12, kcc-12, kip 12, kip12, kip-12, wallet api, browser wallet api, connect wallet, dapp wallet, wallet integration, wallet standard
+KCC-12 is a draft standard for how websites talk to Kaspa browser wallets: one request method, plus a way for a page to discover every installed wallet. It replaces the older KIP-12 idea. It is still a Draft, so not every wallet supports it yet.
+Source: https://kas-smiths.org/t/wallet-integration-protocol/147
+
 ## KRC-20 tokens
 keys: krc20, krc 20, krc-20, token, tokens, kasplex, meme coin, mint, inscription, inscriptions, deploy token
 KRC-20 is a token standard on Kaspa, created by Kasplex. Tokens are written into ordinary Kaspa transactions (a commit-reveal "inscription"), deployed and minted openly, and read by indexers: the network itself ignores the token data, the indexers enforce the rules. Covenant-based tokens, which every node enforces, are the newer alternative. Wallets like Kasware and Kastle can hold and trade KRC-20.
@@ -277,7 +343,7 @@ Source: https://kaspa.com/learn-kaspa/post/dag-and-kaspa
 
 ## NFTs
 keys: nft, nfts, krc721, krc 721, krc-721, collectible, collectibles
-NFTs on Kaspa use the KRC-721 standard (also by Kasplex), inscribed the same way as KRC-20 tokens. Marketplaces and wallets such as Kasware support them.
+NFTs on Kaspa mostly use the KRC-721 standard (also by Kasplex), inscribed the same way as KRC-20 tokens; marketplaces and wallets such as Kasware support them. Covenant-based NFTs are newer: there is a community draft (KCC721) but no official unique-asset KCC yet.
 
 ## Explorers
 keys: explorer, explorers, block explorer, look up transaction, check transaction, txid, track transaction, kas.fyi
@@ -347,6 +413,11 @@ Start at kaspa.org: it links the official community channels, docs and wallets. 
 keys: learn more, learn kaspa, deep dive, technical, how does it work, resources, articles, read more, education
 For deeper reading, the "Learn Kaspa" articles on kaspa.com explain the BlockDAG, GHOSTDAG, finality, pruning, KIPs and smart contracts step by step, and kaspa.org links the docs and the research papers.
 Source: https://kaspa.com/learn-kaspa
+
+## Kas-Smiths forum
+keys: kas smiths, what is kas smiths, kas-smiths, kassmiths, developer forum, dev forum, where do developers discuss, builders forum, contribute, build on kaspa
+Kas-Smiths (kas-smiths.org) is a public forum where Kaspa builders propose and refine standards (KCCs), protocols, tooling and apps. It opened in July 2026, and its content is archived publicly on GitHub. It's the place to follow covenant token standards, wallet APIs and new ideas.
+Source: https://kas-smiths.org/t/welcome-to-kas-smiths/5
 
 ## KaChat
 keys: kachat, ka chat, this app, messaging, messenger, chat app, encrypted, messages on chain
