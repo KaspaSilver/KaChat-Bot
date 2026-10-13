@@ -1,6 +1,6 @@
 """Kaspa answers bot: fixed answers, public, a daily cap per person."""
 import pytest
-from conftest import OTHER_KEY, USER_KEY, addr, make_cfg
+from conftest import OTHER_KEY, USER_KEY, addr, make_cfg, run
 
 from kachat.bots.base import NOT_PRIVATE_NOTICE
 from kachat.bots.faq import best_topic, load_topics
@@ -37,7 +37,7 @@ def test_the_answers_file_loads():
     ("Does Kaspa have smart contracts?", "Smart contracts"),
     ("what are KRC-20 tokens", "KRC-20 tokens"),
     ("what ports does a node use", "Node ports"),
-    ("Is kaspa a good investment", "Price"),
+    ("Is kaspa a good investment", "Investment advice"),
     ("what is DAGKnight", "DAGKnight"),
     ("what's a sompi", "Sompi"),
 ])
@@ -219,7 +219,117 @@ def test_how_to_answers_link_kaspa_silver_videos():
     assert "Video: https://youtu.be/aG3HnXURnrE" in best_topic(TOPICS, "where can I buy kas").answer
     assert best_topic(TOPICS, "is kaspa anonymous").title == "Privacy"
     vids = [line for t in TOPICS for line in t.answer.splitlines() if line.startswith("Video: ")]
-    assert len(vids) == 41 and all(v.startswith("Video: https://youtu.be/") for v in vids)
+    assert len(vids) == 42 and all(v.startswith("Video: https://youtu.be/") for v in vids)
     # the answer comes first, then videos, then the source
     fin = BY_TITLE["Pruning"].answer.splitlines()
     assert fin[-1].startswith("Source: ") and fin[-2].startswith("Video: ")
+
+
+MARKET = {"price": 0.0383218, "marketcap": 1_063_218_750.0, "circulating": 27_752_896_821.7,
+          "max": 28_704_035_605.0, "change24h": -2.34}
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is the price of kaspa", "Price"),
+    ("how much is kas", "Price"),
+    ("what is the current market cap of Kaspa", "Market cap"),
+    ("whats kaspa's marketcap", "Market cap"),
+    ("should I buy now", "Investment advice"),
+])
+def test_price_and_market_cap_questions(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+def test_price_is_live(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    ctxf.market = MARKET
+    reply, ok = run(bot.answer("what is the price of kaspa"))
+    assert ok and reply.startswith("Kaspa (KAS) is about $0.0383 right now (-2.3% in 24 h).")
+
+
+def test_market_cap_is_live(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    ctxf.market = MARKET
+    reply, ok = run(bot.answer("What is the current market cap of Kaspa?"))
+    assert ok and reply.startswith("Kaspa's market cap is about $1.06 billion right now: 27.75 billion KAS in circulation at $0.0383 each")
+    assert "all 28.70 billion KAS) it would be about $1.10 billion" in reply
+
+
+def test_live_answers_fall_back_when_the_feed_is_down(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    ctxf.market = None
+    reply, _ = run(bot.answer("what is the price of kaspa"))
+    assert reply.startswith("I couldn't get the live price just now.")
+    assert "{" not in run(bot.answer("market cap"))[0]
+
+
+def test_people_get_the_live_price_in_the_chat(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    agreed(bot, ctxf, OTHER)
+    ctxf.market = MARKET
+    say(bot, "price?", OTHER)
+    assert texts(ctxf, OTHER)[-1].startswith("Kaspa (KAS) is about $0.0383")
+
+
+def test_fetch_market_reads_api_kaspa_org_and_coingecko():
+    import io, json
+    from kachat.feeds import fetch_market
+
+    answers = {
+        "https://api.kaspa.org/info/price": {"price": 0.0383218},
+        "https://api.kaspa.org/info/marketcap": {"marketcap": 1063218750},
+        "https://api.kaspa.org/info/coinsupply": {"circulatingSupply": "2775289682168719145", "maxSupply": "2870403560500000000"},
+    }
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def opener(req, timeout=None):
+        url = req.full_url
+        if "coingecko" in url:
+            return Resp(json.dumps({"kaspa": {"usd": 0.0383, "usd_market_cap": 1.06e9, "usd_24h_change": 1.5}}).encode())
+        return Resp(json.dumps(answers[url]).encode())
+
+    m = fetch_market(opener=opener)
+    assert m["price"] == 0.0383218 and m["marketcap"] == 1063218750
+    assert round(m["circulating"]) == 27_752_896_822 and round(m["max"]) == 28_704_035_605 and m["change24h"] == 1.5
+
+
+def test_hard_forks_asks_which_one(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    agreed(bot, ctxf, OTHER)
+    say(bot, "hard forks", OTHER)
+    q = texts(ctxf, OTHER)[-1]
+    assert q.startswith("Which do you mean?\n1. Crescendo hard fork\n2. Toccata hard fork\n3. What hard forks are")
+    say(bot, "2", OTHER)
+    assert texts(ctxf, OTHER)[-1] == BY_TITLE["Toccata hard fork"].answer
+    say(bot, "hard fork", OTHER)
+    say(bot, "crescendo", OTHER)
+    assert texts(ctxf, OTHER)[-1] == BY_TITLE["Crescendo hard fork"].answer
+    say(bot, "hardfork?", OTHER)
+    say(bot, "in general", OTHER)
+    assert texts(ctxf, OTHER)[-1] == BY_TITLE["What hard forks are"].answer
+    say(bot, "5", OTHER)                                      # no question pending: a topic number again
+    assert texts(ctxf, OTHER)[-1] == TOPICS[4].answer
+
+
+def test_a_new_question_after_the_follow_up_is_answered_normally(make_bot, ctxf):
+    bot = live(make_bot, ctxf)
+    agreed(bot, ctxf, OTHER)
+    say(bot, "hard forks", OTHER)
+    say(bot, "what is the max supply", OTHER)
+    assert texts(ctxf, OTHER)[-1] == BY_TITLE["Max supply"].answer
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is the crescendo hard fork", "Crescendo hard fork"),
+    ("tell me about the toccata hard fork", "Toccata hard fork"),
+    ("what is a hard fork", "What hard forks are"),
+    ("hard forks", "Hard forks"),
+])
+def test_hard_fork_questions(question, title):
+    assert best_topic(TOPICS, question).title == title

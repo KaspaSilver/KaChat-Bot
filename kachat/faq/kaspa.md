@@ -5,6 +5,8 @@ The Kaspa answers bot replies with these, word for word. Each topic is:
     ## Title (shown in the topics list)
     keys: words or phrases, separated by commas, that point at this topic
     The answer: one short paragraph or a few lines.
+    ask: Title A | Title B | Title C   (optional, instead of an answer: a follow-up question; the answer
+                                        is the question, and a number or a title picks one)
     Video: https://youtu.be/... (title)   (optional, any number: a Kaspa Silver video on the subject)
     Source: https://... (optional last line: where the facts come from; sent with the answer)
 
@@ -114,8 +116,18 @@ keys: dagknight, dag knight, dk, parameterless
 DAGKnight is the planned successor to GHOSTDAG, from the same research. GHOSTDAG uses a fixed worst-case network delay (its k parameter); DAGKnight has no such parameter: it measures how connected the honest blocks actually are, so confirmations speed up when the network is fast and it stays safe when it is slow, as long as honest miners hold over half the hashrate. It is not the live consensus yet.
 Source: https://kaspa.com/learn-kaspa/post/dagknight
 
+## Hard forks
+keys: hard fork, hardfork, hard forks, hardforks, fork, forks, upgrade, upgrades, network upgrade
+ask: Crescendo hard fork | Toccata hard fork | What hard forks are
+Which do you mean?
+
+## What hard forks are
+keys: what is a hard fork, in general, general, what are hard fork, what's a hard fork, hard fork in general, hard forks in general, hard fork mean, why hard fork, how do hard forks work, chain split
+A hard fork is a change to the network's rules that older node software won't accept, so every node and miner has to upgrade. Kaspa plans its hard forks in the open (as KIPs), tests them on testnet, and switches them on at a set DAA score, so when everyone has upgraded the network simply carries on with the new rules and no new coin is created. Crescendo (10 blocks per second) and Toccata (covenants) are recent ones.
+Video: https://youtu.be/mnT0Qahq2iE (Future Hard Forks On Kaspa Explained)
+
 ## Crescendo hard fork
-keys: crescendo, hard fork, hardfork, upgrade, kip 14, kip14, may 2025
+keys: crescendo, crescendo hard fork, crescendo upgrade, kip 14, kip14, may 2025, 10 bps hard fork
 Crescendo was the hard fork of May 5, 2025. It raised Kaspa from 1 to 10 blocks per second and added new script features (KIP-10 introspection) that lay the groundwork for smart contracts and covenants.
 Video: https://youtu.be/GnfYuK7rn24 (Kaspa Crescendo Update: Everything You Need To Know)
 
@@ -208,8 +220,20 @@ KAS trades on many centralized exchanges and some decentralized ones. I don't re
 Video: https://youtu.be/aG3HnXURnrE (How To Purchase Kaspa Without A Centralized Exchange)
 
 ## Price
-keys: price, worth, value, how much is kas, market cap, marketcap, moon, prediction, invest, investment, good investment, buy now, financial advice, pump
-I don't give prices or investment advice. For live prices and alerts, set up the Price bot in KaChat Bot.
+keys: price, price of kaspa, kaspa price, kas price, price of kas, how much is kas, how much is kaspa, how much is one kas, worth, value, what is kas worth, current price
+live: market
+Kaspa (KAS) is about {price} right now{change}. Live from api.kaspa.org; for alerts, set up the Price bot in KaChat Bot. Not investment advice.
+fallback: I couldn't get the live price just now. CoinGecko or CoinMarketCap show it, and the Price bot in KaChat Bot can send you alerts.
+
+## Market cap
+keys: market cap, marketcap, market capitalization, market capitalisation, current market cap, total value, valuation, fully diluted, fdv, how big is kaspa
+live: market
+Kaspa's market cap is about {marketcap} right now: {circulating} KAS in circulation at {price} each{change}. Fully diluted (all {max} KAS) it would be about {fdv}. Live from api.kaspa.org. Not investment advice.
+fallback: I couldn't get live market data just now. CoinGecko or CoinMarketCap show Kaspa's current market cap.
+
+## Investment advice
+keys: invest, investment, good investment, should i buy, buy now, moon, prediction, price prediction, financial advice, pump, will it go up, when lambo, 100x
+I don't give investment advice or price predictions. Only invest what you can afford to lose, keep your KAS in a wallet you control, and do your own research.
 
 ## Smart contracts
 keys: smart contract, smart contracts, contracts, evm, programmability, defi, vprogs, layer 2, layer two, l2, rollup, rollups, igra, kasplex l2

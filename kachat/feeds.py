@@ -10,6 +10,10 @@ from typing import Optional, Tuple
 log = logging.getLogger("kachat.feeds")
 
 KASPA_API_PRICE = "https://api.kaspa.org/info/price"
+KASPA_API_MARKETCAP = "https://api.kaspa.org/info/marketcap"
+KASPA_API_SUPPLY = "https://api.kaspa.org/info/coinsupply"
+COINGECKO_MARKET = ("https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd"
+                    "&include_market_cap=true&include_24hr_change=true")
 COINGECKO_PRICE = "https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies={cur}&include_24hr_change=true"
 
 
@@ -40,6 +44,35 @@ def fetch_price(currency: str = "usd", opener=None) -> Optional[Tuple[float, Opt
     except Exception as exc:
         log.warning("price unavailable: %s", exc)
         return None
+
+
+def fetch_market(opener=None) -> Optional[dict]:
+    """Live market data in USD: {"price", "marketcap", "circulating", "max", "change24h"} (KAS amounts
+    in KAS, change in % or None). api.kaspa.org first (price, market cap, coin supply in sompi);
+    CoinGecko for the 24 h change, and for everything when api.kaspa.org is down."""
+    out: dict = {}
+    try:
+        out["price"] = float(_get_json(KASPA_API_PRICE, opener=opener)["price"])
+        out["marketcap"] = float(_get_json(KASPA_API_MARKETCAP, opener=opener)["marketcap"])
+        sup = _get_json(KASPA_API_SUPPLY, opener=opener)
+        out["circulating"] = int(sup["circulatingSupply"]) / 1e8
+        out["max"] = int(sup["maxSupply"]) / 1e8
+    except Exception as exc:
+        log.info("api.kaspa.org market data failed (%s); trying CoinGecko", exc)
+        out = {}
+    try:
+        k = _get_json(COINGECKO_MARKET, opener=opener)["kaspa"]
+        ch = k.get("usd_24h_change")
+        out["change24h"] = float(ch) if ch is not None else None
+        if "price" not in out:
+            out["price"] = float(k["usd"])
+            out["marketcap"] = float(k["usd_market_cap"])
+            out["circulating"] = out["marketcap"] / out["price"] if out["price"] else None
+            out["max"] = 28_704_026_601.0
+    except Exception as exc:
+        log.info("CoinGecko market data failed: %s", exc)
+        out.setdefault("change24h", None)
+    return out if out.get("price") else None
 
 
 def fetch_bridge_hashrate(url: str, opener=None) -> Optional[float]:

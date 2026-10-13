@@ -83,6 +83,7 @@ class FakeCtxFactory:
         self.clock = Clock()
         self.balance = 5_000_000_000
         self.price = None
+        self.market = None
         self.hashrate = None
         self.spenders = {}
 
@@ -104,8 +105,11 @@ class FakeCtxFactory:
         async def fetch_hashrate():
             return self.hashrate
 
+        async def fetch_market():
+            return self.market
+
         return BotContext(network=NET, send=send, get_balance=get_balance, clock=self.clock,
-                          fetch_price=fetch_price, fetch_hashrate=fetch_hashrate,
+                          fetch_price=fetch_price, fetch_hashrate=fetch_hashrate, fetch_market=fetch_market,
                           spender_of=lambda k: self.spenders.get(k), max_out_per_hour=max_out)
 
 

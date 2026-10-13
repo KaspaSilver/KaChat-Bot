@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from ..address import short_address
@@ -39,6 +39,32 @@ class Topic:
     title: str
     keys: List[str]
     answer: str
+    live: Optional[str] = None       # "market": the answer is a template filled with live market data
+    fallback: str = ""               # sent instead when live data is unavailable
+    ask: List[str] = field(default_factory=list)   # a follow-up question: the titles to choose from
+
+
+def fmt_usd(v: float) -> str:
+    if v >= 1e9:
+        return f"${v / 1e9:,.2f} billion"
+    if v >= 1e6:
+        return f"${v / 1e6:,.2f} million"
+    if v >= 1:
+        return f"${v:,.2f}"
+    return f"${v:.4f}".rstrip("0").rstrip(".") if v >= 0.0001 else f"${v:.8f}"
+
+
+def fmt_kas_big(v: float) -> str:
+    return f"{v / 1e9:,.2f} billion" if v >= 1e9 else f"{v:,.0f}"
+
+
+def fill_live(template: str, m: dict) -> str:
+    """An answer template with {price} {marketcap} {circulating} {max} {fdv} {change}."""
+    ch = m.get("change24h")
+    change = "" if ch is None else f" ({'+' if ch >= 0 else ''}{ch:.1f}% in 24 h)"
+    return template.format(price=fmt_usd(m["price"]), marketcap=fmt_usd(m["marketcap"]),
+                           circulating=fmt_kas_big(m["circulating"]), max=fmt_kas_big(m["max"]),
+                           fdv=fmt_usd(m["price"] * m["max"]), change=change)
 
 
 def _norm(text: str) -> str:
@@ -58,14 +84,23 @@ def load_topics(path: str = FAQ_FILE) -> List[Topic]:
         title = lines[0].strip()
         keys: List[str] = []
         body: List[str] = []
+        live, fallback, ask = None, "", []
         for line in lines[1:]:
-            if line.lower().startswith("keys:") and not body:
+            low = line.lower()
+            if low.startswith("ask:") and not body:
+                ask = [a.strip() for a in line[4:].split("|") if a.strip()]
+                continue
+            if low.startswith("keys:") and not body:
                 keys = [k.strip() for k in line[5:].split(",") if k.strip()]
+            elif low.startswith("live:") and not body:
+                live = line[5:].strip()
+            elif low.startswith("fallback:"):
+                fallback = line[9:].strip()
             else:
                 body.append(line)
         answer = "\n".join(body).strip()
         if title and answer:
-            topics.append(Topic(title, keys, answer))
+            topics.append(Topic(title, keys, answer, live, fallback, ask))
     return topics
 
 
@@ -91,6 +126,7 @@ class FaqBot(Bot):
 
     def __init__(self, *a, **kw):
         self.topics = load_topics()
+        self.by_title = {t.title: t for t in self.topics}
         super().__init__(*a, **kw)
         self.data.setdefault("askers", {"day": "", "counts": {}})
         self.data.setdefault("answered", 0)
@@ -152,29 +188,69 @@ class FaqBot(Bot):
 
     def reply_for(self, text: str) -> Tuple[str, bool]:
         """The reply to one message, and whether it was an answer (False = no match)."""
+        reply, matched, _ = self._match(text)
+        return reply, matched
+
+    def ask_text(self, topic: Topic) -> str:
+        lines = [topic.answer] + [f"{i}. {t}" for i, t in enumerate(topic.ask, 1)]
+        return "\n".join(lines + ["Reply with a number."])
+
+    def _choice(self, asked: List[str], text: str) -> Optional[Topic]:
+        """The option a reply to a follow-up question picks: its number, or words from its title."""
+        bare = (text or "").strip().lower().rstrip(".!?")
+        options = [self.by_title[t] for t in asked if t in self.by_title]
+        if bare.isdigit() and 1 <= int(bare) <= len(options):
+            return options[int(bare) - 1]
+        return best_topic(options, text) if options else None
+
+    async def answer(self, text: str, who: Optional[str] = None) -> Tuple[str, bool]:
+        """reply_for, with live topics (price, market cap) filled in from current market data, and
+        follow-up questions (`ask:`): the question goes out, and `who`'s next reply picks an option."""
+        pending = self.data.setdefault("asked", {})
+        asked = pending.pop(who, None) if who else None
+        topic = self._choice(asked, text) if asked else None
+        if topic is not None:
+            reply, matched = topic.answer, True
+        else:
+            reply, matched, topic = self._match(text)
+        if topic is not None and topic.ask:
+            if who:
+                pending[who] = topic.ask
+                if len(pending) > 1000:
+                    pending.pop(next(iter(pending)))
+            return self.ask_text(topic), True
+        if topic is not None and topic.live == "market":
+            m = await self.ctx.fetch_market() if self.ctx.fetch_market else None
+            try:
+                return (fill_live(topic.answer, m) if m else topic.fallback or topic.answer), True
+            except (KeyError, TypeError, ValueError):
+                return topic.fallback or topic.answer, True
+        return reply, matched
+
+    def _match(self, text: str) -> Tuple[str, bool, Optional[Topic]]:
         t = (text or "").strip()
         bare = t.lower().lstrip("/").strip().rstrip(".!?？！。～~").strip()
         if bare in GREETINGS or not bare:
-            return self.topics_text(), True
+            return self.topics_text(), True, None
         if bare in THANKS:
-            return THANKS_REPLY, True
+            return THANKS_REPLY, True, None
         if bare in SMALL_TALK:
-            return SMALL_TALK_REPLY, True
+            return SMALL_TALK_REPLY, True, None
         if bare.isdigit():
             n = int(bare)
             if 1 <= n <= len(self.topics):
-                return self.topics[n - 1].answer, True
-            return f"Pick a number from 1 to {len(self.topics)}, or send topics.", True
+                return self.topics[n - 1].answer, True, self.topics[n - 1]
+            return f"Pick a number from 1 to {len(self.topics)}, or send topics.", True, None
         topic = best_topic(self.topics, t)
         if topic:
-            return topic.answer, True
+            return topic.answer, True, topic
         if not re.search(r"[a-z]", bare):
-            return ENGLISH_ONLY_REPLY, False       # still listed as missed, so you see what people ask
+            return ENGLISH_ONLY_REPLY, False, None       # still listed as missed, so you see what people ask
         # "Hello, test." and the like: a greeting with nothing to answer.
         words = re.sub(r"[^a-z ]+", " ", bare).split()
         if words and (words[0] in GREETINGS or " ".join(words[:2]) in GREETINGS) and len(words) <= 4:
-            return self.topics_text(), True
-        return "I don't have an answer for that one yet. Send topics to see what I can answer.", False
+            return self.topics_text(), True, None
+        return "I don't have an answer for that one yet. Send topics to see what I can answer.", False, None
 
     def _today(self) -> dict:
         today = day_key(self.ctx.clock())
@@ -189,7 +265,7 @@ class FaqBot(Bot):
         self.data["missed"] = (missed + [text[:120]])[-MISSED_MAX:]
 
     async def _reply(self, recipient: str, text: str) -> None:
-        reply, matched = self.reply_for(text)
+        reply, matched = await self.answer(text, who=recipient)
         if not matched:
             self._note_missed((text or "").strip())
         if await self.send_to(recipient, reply):

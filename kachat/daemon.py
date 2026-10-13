@@ -21,7 +21,7 @@ from .alias import watch_alias
 from .bots import Bot, BotContext, make_bot
 from .chain import ChainFollower, ChainTx, IndexerClient, is_chat_payload_hex
 from .crypto import CryptoError, open_sealed
-from .feeds import fetch_bridge_hashrate, fetch_price
+from .feeds import fetch_bridge_hashrate, fetch_market, fetch_price
 from .node import GrpcNode, utxo_entry_dict
 from .payload import message_text, parse_payload
 from .send import InsufficientFunds, KaspaSdkBackend, MessageSender, SOMPI_PER_KAS
@@ -77,6 +77,7 @@ class Daemon:
             send=self._send,
             get_balance=self._balance,
             fetch_price=self._price,
+            fetch_market=self._market,
             fetch_hashrate=self._hashrate if self.bridge_url else None,
             spender_of=lambda key: self.spenders.get(key),
             max_out_per_hour=self.max_out_per_hour,
@@ -95,6 +96,16 @@ class Daemon:
         except Exception as exc:
             log.info("balance of %s unavailable: %s", address, exc)
             return None
+
+    async def _market(self):
+        # The Kaspa answers bot's live price and market cap: one fetch a minute serves everyone.
+        hit = self._price_cache.get("market")
+        if hit and time.time() - hit[0] < 60:
+            return hit[1]
+        got = await asyncio.to_thread(fetch_market)
+        if got:
+            self._price_cache["market"] = (time.time(), got)
+        return got
 
     async def _price(self, currency: str):
         # Every person on a public price bot polls; one fetch a minute serves them all.

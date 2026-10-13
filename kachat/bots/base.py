@@ -115,6 +115,7 @@ class BotContext:
     clock: Callable[[], float] = time.time
     fetch_price: Optional[Callable] = None  # async (currency) -> (price, change24h_pct | None)
     fetch_hashrate: Optional[Callable] = None   # async () -> GH/s | None
+    fetch_market: Optional[Callable] = None     # async () -> feeds.fetch_market() dict | None
     spender_of: Callable[[str], Optional[str]] = lambda key: None
     max_out_per_hour: int = DEFAULT_MAX_OUT_PER_HOUR
     on_change: Callable = lambda bot: None  # status changed -> write it
