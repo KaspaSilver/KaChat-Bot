@@ -182,10 +182,20 @@ keys: gpu, gpus, graphics card, nvidia, amd, rig, gpu mining
 GPU mining Kaspa is no longer profitable: ASICs took over the network in 2023 and are many times more efficient.
 
 ## How to mine
-keys: how to mine, how do i mine, start mining, mining pool, pool, solo mining, solo mine, stratum
+keys: how to mine, how do i mine, start mining, get started mining, mine kaspa, stratum
 Point a kHeavyHash ASIC at a mining pool, or mine solo: run your own Kaspa node plus a stratum bridge (Kaspa Quick Start sets up both) and point your miner at it. Solo mining only pays when you find a block yourself, so it suits bigger hashrates.
 Video: https://youtu.be/1IR7vAE6NCQ (How To Solo Mine Kaspa With Your Own Node)
 Video: https://youtu.be/WHBlwJ2sN7Q (Solo Mine Using A Raspberry Pi 5 As Your Node)
+
+## Mining pools
+keys: mining pool, mining pools, pool, pools, connect my miner, miner to a pool, point my miner, set up a pool, what is a pool, what is a mining pool, which pool, best pool, join a pool, pool fee, pool fees, pplns, pps, pps+, payout, payouts, minimum payout, pool payout, stratum url, pool address, miningpoolstats, pool list
+A mining pool combines many miners' hashrate and shares each block reward among them in proportion to the work they submit, so you get small, steady payouts instead of waiting to find a block yourself. To join, point your ASIC at the pool's stratum address with your Kaspa address as the username (usually address.workername). Compare the fee (often about 1%), payout method (PPLNS or PPS+), minimum payout and server location; miningpoolstats.stream/kaspa lists pools. Mining with smaller pools keeps Kaspa more decentralized.
+
+## Solo mining vs a pool
+keys: solo, solo mining, solo mine, mine solo, solo vs pool, pool vs solo, should i solo mine, solo or pool, how long to find a block, chance to find a block, blocks per day for my miner, variance, luck, lottery
+Solo mining sends every block you find straight to your own address through your own node and a stratum bridge (Kaspa Quick Start sets up both), with no pool fee, but it depends on luck. Kaspa makes 864,000 blocks a day, so you can expect about 864,000 x your hashrate / network hashrate blocks a day: a small miner may wait days between rewards, while a pool pays a little all the time. Solo mining also helps decentralization, since you build your own blocks.
+Video: https://youtu.be/1IR7vAE6NCQ (How To Solo Mine Kaspa With Your Own Node)
+Video: https://youtu.be/PglrShDyR5U (Solo Mining Kaspa For One Month With Only 600GH)
 
 ## Staking
 keys: staking, stake, proof of stake, pos, validator, validators, delegate, earn interest, yield

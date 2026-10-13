@@ -452,3 +452,18 @@ def test_core_dev_telegram(question):
 ])
 def test_wallet_security_questions(question, title):
     assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is a mining pool", "Mining pools"),
+    ("which pool should I join", "Mining pools"),
+    ("what are pool fees", "Mining pools"),
+    ("what is pplns", "Mining pools"),
+    ("how do I connect my miner to a pool", "Mining pools"),
+    ("should I solo mine or join a pool", "Solo mining vs a pool"),
+    ("how long to find a block solo", "Solo mining vs a pool"),
+    ("how do I solo mine", "Solo mining vs a pool"),
+    ("how do I start mining", "How to mine"),
+])
+def test_mining_pool_questions(question, title):
+    assert best_topic(TOPICS, question).title == title
