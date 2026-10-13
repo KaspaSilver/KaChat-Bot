@@ -220,7 +220,7 @@ Kaspa uses UTXOs like Bitcoin: your balance is a set of separate coins. Many sma
 Video: https://youtu.be/0bElcfLU7E8 (Kaspa UTXOs Explained)
 
 ## Wallets
-keys: wallet, wallets, best wallet, which wallet, kaspium, kasware, kastle, kaspa ng, tangem, ledger, kasvault, hardware wallet, store kas
+keys: wallet, wallets, best wallet, which wallet, kaspium, kasware, kastle, kaspa ng, tangem, ledger, kasvault, store kas
 Popular Kaspa wallets: Kaspa NG (desktop and web, by the core developers), Kaspium (mobile), Kasware and Kastle (browser extensions), and hardware wallets such as Tangem and Ledger (through KasVault). Download a wallet only from its official site or app store.
 Video: https://youtu.be/QfwAyw0v4RE (Ranking Kaspa Wallets)
 Video: https://youtu.be/8HDJw0AE9bU (Kaspa NG Wallet Setup Guide)
@@ -229,10 +229,24 @@ Video: https://youtu.be/hTpyW9cT0ZY (KasWare Setup)
 Video: https://youtu.be/j_OdFJQ5dYQ (Tangem Guide)
 Video: https://youtu.be/qCMFtagUftA (Ledger Setup)
 
+## What is a seed phrase
+keys: what is a seed phrase, what's a seed phrase, seed phrase, recovery phrase, mnemonic, mnemonic phrase, secret phrase, 12 words, 24 words, twelve words, bip39, restore wallet, recover wallet, restore my wallet
+A seed phrase (recovery phrase) is the list of 12 or 24 ordinary words your wallet shows when you create it. It is your wallet's master key: every address and private key in the wallet comes from it, so with those words you can restore your KAS in any compatible Kaspa wallet, even if your phone or computer is lost. Anyone else who gets the words can take your KAS, so write them down in order, keep them offline, and never share them.
+
 ## Seed phrase safety
-keys: seed, seed phrase, recovery phrase, mnemonic, private key, 12 words, 24 words, backup, lost wallet, keys
-Your seed phrase is your money. Write it down offline, never type it into a website or chat, and never share it with anyone. No real support person, admin or bot will ever ask for it, including me.
+keys: seed safety, keep my seed safe, store my seed, store seed phrase, protect my seed, protect seed phrase, asked for my seed, someone asked, share my seed, lost seed, lost my seed, backup, back up, metal backup, lost wallet, where to keep seed
+Your seed phrase is your money. Write it down on paper or metal, keep copies somewhere safe from fire and water, never photograph it or type it into a website, chat or cloud note, and never share it. No real support person, admin or bot will ever ask for it, including me. If you lose it and your device, the KAS can't be recovered.
+Video: https://youtu.be/8ruG97fgrx4 (Protect Your Kaspa Seed Phrase With iHodl)
+
+## Private keys
+keys: private key, private keys, what is a private key, public key, public keys, secret key, signing key, not your keys, not your coins, keys vs address, key and address, what are keys
+A private key is the secret number that proves you own your coins: your wallet uses it to sign every transaction you send. Your public key comes from it, and your Kaspa address is made from the public key, so you can share your address freely but never the private key. A seed phrase can recreate all of a wallet's private keys. Whoever holds the keys controls the KAS, hence "not your keys, not your coins": KAS left on an exchange is really the exchange's.
+
+## Cold storage
+keys: cold storage, cold wallet, cold wallets, offline wallet, store offline, keep offline, hardware wallet, hardware wallets, hot wallet, hot wallets, hot vs cold, cold vs hot, paper wallet, safest way to store, store long term, long term storage, self custody
+Cold storage means keeping the keys to your KAS on something that never touches the internet, so hackers and malware can't reach them: usually a hardware wallet (Tangem, Ledger through KasVault, OneKey and SafePal X1 support Kaspa) or keys kept only on paper. A hot wallet (phone, browser or desktop app) is handier for daily spending. Many people keep a little in a hot wallet and the rest cold. Buy hardware wallets only from the maker.
 Video: https://youtu.be/nPm6MxvGAFc (Hot Wallet vs. Cold Storage)
+Video: https://youtu.be/kRM2c1AEQAo (Kaspa Paper Wallet Tutorial)
 
 ## Privacy
 keys: privacy, private, anonymous, anonymity, untraceable, traceable, privacy coin, hide transactions, can people see my balance

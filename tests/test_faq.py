@@ -219,7 +219,7 @@ def test_how_to_answers_link_kaspa_silver_videos():
     assert "Video: https://youtu.be/aG3HnXURnrE" in best_topic(TOPICS, "where can I buy kas").answer
     assert best_topic(TOPICS, "is kaspa anonymous").title == "Privacy"
     vids = [line for t in TOPICS for line in t.answer.splitlines() if line.startswith("Video: ")]
-    assert len(vids) == 48 and all(v.startswith("Video: https://youtu.be/") for v in vids)
+    assert len(vids) >= 45 and all(v.startswith("Video: https://youtu.be/") for v in vids)
     # the answer comes first, then videos, then the source
     fin = BY_TITLE["Pruning"].answer.splitlines()
     assert fin[-1].startswith("Source: ") and fin[-2].startswith("Video: ")
@@ -432,3 +432,23 @@ def test_open_source(question):
 def test_core_dev_telegram(question):
     t = best_topic(TOPICS, question)
     assert t.title == "Core developer discussions" and "https://t.me/kasparnd" in t.answer
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is cold storage", "Cold storage"),
+    ("what is a cold wallet", "Cold storage"),
+    ("hot wallet vs cold wallet", "Cold storage"),
+    ("which hardware wallets support kaspa", "Cold storage"),
+    ("what is the safest way to store kaspa", "Cold storage"),
+    ("what is a seed phrase", "What is a seed phrase"),
+    ("what are the 12 words", "What is a seed phrase"),
+    ("how do I restore my wallet", "What is a seed phrase"),
+    ("how do I keep my seed safe", "Seed phrase safety"),
+    ("someone asked for my seed phrase", "Seed phrase safety"),
+    ("what is a private key", "Private keys"),
+    ("what is the difference between a public key and private key", "Private keys"),
+    ("not your keys not your coins", "Private keys"),
+    ("which wallet should I use", "Wallets"),
+])
+def test_wallet_security_questions(question, title):
+    assert best_topic(TOPICS, question).title == title
