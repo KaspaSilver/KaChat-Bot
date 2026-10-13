@@ -78,8 +78,10 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
   people can use one bot). Its wallet balance is the only cap on its spending: keep only a few KAS in it.
   (Each message someone sends it costs them a network fee too, about what the bot's reply costs.)
 - An address that is far too busy to message about (a mining pool's address gets a reward almost every block, an
-  exchange's gets payments all the time) is dropped automatically: more than 5 payments in a minute, or more than
-  20 in 10 minutes, and the mining or wallet bot stops watching it and tells the person to choose an address that
+  exchange's gets payments all the time) is dropped automatically: more than 20 new payments in a minute, or more
+  than 100 in 10 minutes (about 1.7% of all Kaspa blocks; a home miner finds a tiny fraction of that), and the
+  mining or wallet bot stops watching it. Each payment counts once (block rewards only on a mining bot; spends
+  and the node re-reporting the same coin as the chain tip settles don't count) and tells the person to choose an address that
   does not have this much activity. If it was their only address, setup starts over.
 - When a bot's balance falls below 0.5 KAS it tells the people who use it, once (up to the 50 most recent who
   used it in the last 30 days and agreed to the notice), that its wallet is low, with a KaChat payment request link

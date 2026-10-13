@@ -16,6 +16,7 @@ Spending rules (every reply costs a network fee):
 """
 from __future__ import annotations
 
+import collections
 import copy
 import logging
 import re
@@ -49,9 +50,12 @@ def is_agree(text: str) -> bool:
 YES_NO = {"yes": True, "y": True, "yeah": True, "ok": True, "no": False, "n": False, "nope": False}
 COMMANDS = ("help", "status", "settings", "change", "reset", "add", "pause", "resume", "test")
 MAX_WATCHED = 10                 # addresses one mining or wallet bot may watch
-# Too busy to watch (a pool's address gets a reward almost every block): more than `count`
-# payments within `seconds` and the address is dropped, with a message asking for a quieter one.
-BUSY_LIMITS = ((60, 5), (600, 20))
+# Too busy to watch: more than `count` new payments within `seconds` and the address is dropped,
+# with a message asking for a quieter one. Kaspa makes 864,000 blocks a day (600 a minute), so 100
+# rewards in 10 minutes is about 1.7% of every block: a pool's address, never a home miner's. Only
+# new payments count, each once (see too_busy).
+BUSY_LIMITS = ((60, 20), (600, 100))
+BUSY_SEEN_MAX = 5000
 SKIP_WORDS = ("skip", "default", "keep", "-")
 
 
@@ -356,7 +360,22 @@ class Bot:
         if address not in self.address_list():
             return False
         now = self.ctx.clock()
-        events = len(added) + (1 if removed else 0)
+        # Each new payment once: at 10 blocks a second the node often removes and re-adds the same
+        # coin as the chain tip settles, and spends from the address are not payments at all.
+        counted = getattr(self, "_busy_counted", None)
+        if counted is None:
+            counted = self._busy_counted = collections.OrderedDict()
+        events = 0
+        for e in self.busy_events(added):
+            key = f"{e.get('txid')}:{e.get('index')}"
+            if key in counted:
+                continue
+            counted[key] = True
+            events += 1
+        while len(counted) > BUSY_SEEN_MAX:
+            counted.popitem(last=False)
+        if not events:
+            return False
         longest = max(w for w, _ in BUSY_LIMITS)
         act = self.data.setdefault("activity", {})
         times = [t for t in act.get(address, []) if now - t < longest] + [now] * events
@@ -379,6 +398,10 @@ class Bot:
         await self.say(text)
         self.save()
         return True
+
+    def busy_events(self, added: list) -> list:
+        """The payments that count toward too_busy: every new coin (a mining bot: rewards only)."""
+        return list(added)
 
     def remove_watched(self, address: str) -> int:
         """Stops watching one address; how many are left. None left: setup starts over."""

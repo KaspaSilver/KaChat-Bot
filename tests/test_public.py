@@ -161,13 +161,13 @@ def test_a_pool_address_is_dropped_with_a_message(ctxf):
     POOL = addr("77" * 32)
     bot = _mining_with(ctxf, WATCH, POOL)
     before = len(texts(ctxf, OTHER))
-    for i in range(10):                                        # a reward every second
+    for i in range(40):                                        # a reward every second: a pool
         run(bot.on_utxos(POOL, [_coin(i + 1, POOL)], []))
         ctxf.clock.t += 1
     got = texts(ctxf, OTHER)[before:]
     assert got[-1].startswith("I stopped watching") and "does not have this much activity" in got[-1]
-    assert "Send add" in got[-1]
-    assert len(got) == 6                                       # 5 rewards, then the message, then silence
+    assert "more than 20 payments in a minute" in got[-1] and "Send add" in got[-1]
+    assert len(got) == 21                                      # 20 rewards, then the message, then silence
     assert bot.people[OTHER].address_list() == [WATCH]
     assert POOL not in bot.watched_addresses() and WATCH in bot.watched_addresses()
 
@@ -175,7 +175,7 @@ def test_a_pool_address_is_dropped_with_a_message(ctxf):
 def test_last_busy_address_dropped_asks_for_another(ctxf):
     POOL = addr("77" * 32)
     bot = _mining_with(ctxf, POOL)
-    for i in range(6):
+    for i in range(21):
         run(bot.on_utxos(POOL, [_coin(i + 1, POOL)], []))
     p = bot.people[OTHER]
     assert p.stage == "setup" and "1/2" in texts(ctxf, OTHER)[-1]
@@ -198,9 +198,33 @@ def test_a_busy_wallet_address_is_dropped(ctxf):
     say(bot, EXCHANGE, OTHER)
     say(bot, "Exchange", OTHER)
     say(bot, "0", OTHER)
-    for i in range(25):                                        # a payment every 20 s
+    for i in range(110):                                       # a payment every 5 s, for 9 minutes
         run(bot.on_utxos(EXCHANGE, [_coin(i + 1, EXCHANGE, coinbase=False)], []))
-        ctxf.clock.t += 20
+        ctxf.clock.t += 5
         run(bot.tick(ctxf.clock.t))
     assert any(t.startswith("I stopped watching Exchange") for t in texts(ctxf, OTHER))
     assert bot.watched_addresses() == set()
+
+
+
+def test_reorg_churn_and_spends_do_not_count_as_payments(ctxf):
+    bot = _mining_with(ctxf, WATCH)
+    coin = _coin(1, WATCH)
+    for _ in range(30):                                        # the same reward removed and re-added
+        run(bot.on_utxos(WATCH, [coin], []))
+        run(bot.on_utxos(WATCH, [], [coin]))
+    for i in range(30):                                        # the owner spending from the address
+        run(bot.on_utxos(WATCH, [], [_coin(100 + i, WATCH)]))
+    for i in range(30):                                        # change outputs are not rewards
+        run(bot.on_utxos(WATCH, [_coin(200 + i, WATCH, coinbase=False)], []))
+    assert bot.people[OTHER].address_list() == [WATCH]
+    assert not any("stopped watching" in t for t in texts(ctxf, OTHER))
+    assert sum("Block reward" in t for t in texts(ctxf, OTHER)) == 1     # one reward, one message
+
+
+def test_a_lucky_burst_from_a_home_miner_is_kept(ctxf):
+    bot = _mining_with(ctxf, WATCH)
+    for i in range(8):                                         # 8 blocks in under a minute
+        run(bot.on_utxos(WATCH, [_coin(i + 1, WATCH)], []))
+        ctxf.clock.t += 5
+    assert bot.people[OTHER].address_list() == [WATCH]

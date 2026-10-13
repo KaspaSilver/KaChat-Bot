@@ -96,6 +96,9 @@ class MiningBot(Bot):
             lines.append(f"Hashrate: {fmt_hashrate(hashrate)}")
         return "\n".join(lines)
 
+    def busy_events(self, added: list) -> list:
+        return [e for e in added if e.get("isCoinbase")]     # block rewards, nothing else
+
     async def on_utxos(self, address: str, added: list, removed: list) -> None:
         s = self.settings
         if address not in self.address_list() or self.stage != "active":
