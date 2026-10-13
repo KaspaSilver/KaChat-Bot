@@ -32,10 +32,39 @@ keys: who created, who made, who built, founder, founders, creator, team, yonata
 Kaspa grew out of research by Yonatan Sompolinsky and Aviv Zohar (the GHOSTDAG/PHANTOM papers). It is open source and built by a community of independent developers. No company owns or controls it.
 Video: https://youtu.be/pTxyCsC5_rU (Kaspa Founder: Yonatan Sompolinsky)
 
+## Who owns Kaspa
+keys: who owns, who owns kaspa, who funds kaspa, funds kaspa development, who pays for development, owner, owners, owns kaspa, who controls, controls kaspa, who runs, runs kaspa, company, company behind, is kaspa a company, ceo, who is in charge, in charge, centralized, who funds, funding, funded, who pays the developers, foundation, who decides
+Nobody owns Kaspa. There is no company, CEO or foundation in charge: it is an open-source network run by independent node operators and secured by miners all over the world, and anyone can join either. It launched fairly in 2021 with no premine, no ICO and no coins for founders or investors. Developers are independent contributors, often funded by community donations; groups like the Kaspa Ecosystem Foundation support the ecosystem but don't control the network. Changes are proposed in public (KIPs) and only take effect when node operators and miners choose to run them.
+Video: https://youtu.be/08MiJtRic_o (How Does Kaspa Operate Without A Company?)
+Video: https://youtu.be/_h2aT6csX9A (Kaspa: A Cryptocompany Or Cryptocurrency?)
+
+## Open source and decentralization
+keys: open source, opensource, source code, the code, kaspa code, github, where is the code, is kaspa open source, decentralized, decentralization, decentralised, what makes kaspa decentralized, how decentralized, permissionless, can anyone run, trustless
+Kaspa is open source: the full node software is public at github.com/kaspanet/rusty-kaspa, so anyone can read it, check it, build it and run it. That is what keeps it decentralized: thousands of independent nodes each verify every block themselves, anyone can mine without permission, and no one can slip in a rule change, because each node operator decides which software to run. If the developers ever went away, anyone could carry the code on.
+Video: https://youtu.be/zfURyWwP6Zs (What Makes Kaspa Decentralized?)
+
 ## Fair launch
-keys: fair launch, premine, pre mine, ico, presale, pre sale, dev fee, founders reward, vc, investors, allocation
-Kaspa launched on November 7, 2021 with no premine, no ICO or presale, and no coins set aside for developers or investors. Every KAS in existence was mined.
+keys: did kaspa have an ico, was there an ico, kaspa ico, have an ico, fair launch, fairly launched, importance of fair launch, why fair launch, fair launch important, fair launch matter, what is a fair launch, fair distribution, distribution, distributed, coins distributed, ico, presale, pre sale, dev fee, founders reward, vc, investors, allocation
+Kaspa launched on November 7, 2021 with no premine, no ICO or presale, and no coins set aside for founders, developers or investors: every KAS in existence was mined. That matters because nobody started with a pile of coins to sell to everyone else, no company raised money by issuing it, and new coins went to whoever did the work of mining, the same way Bitcoin began. It is a big part of why Kaspa is community-owned money rather than a company's product.
 Video: https://youtu.be/BBIiLcRUEmE (The Importance And Misconception Of Fair Launch)
+
+## Premine
+keys: premine, pre mine, premined, pre-mined, was kaspa premined, was there a premine, what is a premine, instamine, insta mine, founder coins, dev coins
+A premine is when a project's creators make coins for themselves before anyone else can mine, often in the very first (genesis) block. Kaspa had none: mining was open to everyone from launch on November 7, 2021, no coins went to founders, developers or investors, and its genesis block creates no coins at all (its coinbase has no outputs). Anyone can check the genesis block on an explorer.
+Video: https://youtu.be/wEMZX6Lp8Tg (Kaspa Delivers! Proof Of No "Premine")
+
+## Genesis block
+keys: genesis, genesis block, first block, block zero, block 0, genesis message, genesis hash, black tuesday, network crash, restart, checkpoint
+Kaspa launched on November 7, 2021. After a network crash later that month it was restarted from a checkpoint, so the current genesis block (dated November 22, 2021) carries a commitment to all the balances mined up to then instead of starting from zero, and creates no new coins. Its message is a verse in Aramaic (Ezra 7:18) that contains the word "kaspa", silver, plus the hash of Bitcoin block 711,295, proving it was made no earlier than November 25, 2021.
+Video: https://youtu.be/FaoCv5ubEJI (Kaspa Black Tuesday Network Crash)
+
+## The Bible verse in the genesis block
+keys: bible, bible verse, verse, verse in the genesis block, genesis block verse, verse in the genesis, genesis verse, scripture, ezra, ezra 7, ezra 7:18, aramaic, hebrew, genesis verse, verse in the code, verse in kaspa, artaxerxes
+Kaspa's genesis block quotes Ezra 7:18, from the part of the Book of Ezra written in Aramaic: "And whatsoever shall seem good to thee, and to thy brethren, to do with the rest of the silver and the gold, that do after the will of your God" (KJV). In it the Persian king Artaxerxes sends Ezra to Jerusalem with silver and gold and trusts him and his brothers to use what is left as they see fit. Its Aramaic word for silver is kaspa, the coin's name: a fitting line for money handed to its community.
+
+## What is an ICO
+keys: what is an ico, what's an ico, ico, icos, initial coin offering, initial coin offerings, ico mean, coin offering, token sale, presale
+An ICO (initial coin offering) is when a project sells its new coins to the public to raise money, usually before the product exists, a bit like selling shares but typically without the protections investors get. The team and early insiders often keep a big share. Many ICOs around 2017 ended in losses or scams. Kaspa had no ICO or presale: it was fair launched in 2021, so every KAS was mined.
 
 ## Max supply
 keys: max supply, maximum supply, total supply, supply cap, how many kas, how many coins, hard cap, total coins
@@ -122,7 +151,7 @@ ask: Crescendo hard fork | Toccata hard fork | What hard forks are
 Which do you mean?
 
 ## What hard forks are
-keys: what is a hard fork, in general, general, what are hard fork, what's a hard fork, hard fork in general, hard forks in general, hard fork mean, why hard fork, how do hard forks work, chain split
+keys: what is a hard fork, in general, what are hard fork, what's a hard fork, hard fork in general, hard forks in general, hard fork mean, why hard fork, how do hard forks work, chain split
 A hard fork is a change to the network's rules that older node software won't accept, so every node and miner has to upgrade. Kaspa plans its hard forks in the open (as KIPs), tests them on testnet, and switches them on at a set DAA score, so when everyone has upgraded the network simply carries on with the new rules and no new coin is created. Crescendo (10 blocks per second) and Toccata (covenants) are recent ones.
 Video: https://youtu.be/mnT0Qahq2iE (Future Hard Forks On Kaspa Explained)
 
@@ -167,7 +196,7 @@ keys: sompi, smallest unit, decimals, satoshi, divisible, unit
 The smallest unit of KAS is the sompi. 1 KAS = 100,000,000 sompi, so KAS has 8 decimals like Bitcoin.
 
 ## Addresses
-keys: address, addresses, kaspa:, address format, kaspa:q, kaspa:p, kaspatest
+keys: address, addresses, address format, kaspa:q, kaspa:p, kaspatest
 Mainnet addresses start with "kaspa:" and testnet addresses with "kaspatest:". A normal wallet address starts with kaspa:q; one starting with kaspa:p is a script (P2SH) address. The address includes a checksum, so a typo is caught instead of sending to a wrong address.
 
 ## Fees
@@ -406,13 +435,17 @@ keys: kip, kips, improvement proposal, proposal, governance, roadmap, who decide
 Changes to Kaspa are written up as KIPs (Kaspa Improvement Proposals), discussed in public on GitHub (kaspanet/kips), and adopted when node operators and miners run the new software.
 
 ## Official links
-keys: website, official, links, discord, telegram, twitter, community, github, docs, documentation
+keys: website, official, links, discord, twitter, community, docs, documentation
 Start at kaspa.org: it links the official community channels, docs and wallets. The code is on github.com/kaspanet. Beware of look-alike sites and accounts.
 
 ## Learn more
 keys: learn more, learn kaspa, deep dive, technical, how does it work, resources, articles, read more, education
-For deeper reading, the "Learn Kaspa" articles on kaspa.com explain the BlockDAG, GHOSTDAG, finality, pruning, KIPs and smart contracts step by step, and kaspa.org links the docs and the research papers.
+For deeper reading, the "Learn Kaspa" articles on kaspa.com explain the BlockDAG, GHOSTDAG, finality, pruning, KIPs and smart contracts step by step, and kaspa.org links the docs and the research papers. Core developers discuss research in public in the Kaspa Core R&D Telegram group: t.me/kasparnd
 Source: https://kaspa.com/learn-kaspa
+
+## Core developer discussions
+keys: core devs, core developers, core dev, kaspa developers talk, where do developers talk, research and development, r&d, rnd, telegram, kasparnd, development updates, follow development, follow kaspa development, where can i follow, what are the devs working on, roadmap discussion
+Kaspa's core research and development is discussed in public in the Kaspa Core R&D Telegram group: https://t.me/kasparnd. Anyone can join and read along as the core developers and researchers talk through upgrades and ideas. Builders work on shared standards (KCCs) on the Kas-Smiths forum (kas-smiths.org), and the code itself is at github.com/kaspanet.
 
 ## Kas-Smiths forum
 keys: kas smiths, what is kas smiths, kas-smiths, kassmiths, developer forum, dev forum, where do developers discuss, builders forum, contribute, build on kaspa

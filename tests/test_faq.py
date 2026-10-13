@@ -29,7 +29,7 @@ def test_the_answers_file_loads():
     ("When is the next halving?", "Emission and halving"),
     ("how many blocks per second does it do", "Blocks per second"),
     ("Can I stake KAS?", "Staking"),
-    ("is there a premine", "Fair launch"),
+    ("is there a premine", "Premine"),
     ("which wallet should I use", "Wallets"),
     ("someone asked for my seed phrase", "Seed phrase safety"),
     ("What is GHOSTDAG", "GHOSTDAG"),
@@ -219,7 +219,7 @@ def test_how_to_answers_link_kaspa_silver_videos():
     assert "Video: https://youtu.be/aG3HnXURnrE" in best_topic(TOPICS, "where can I buy kas").answer
     assert best_topic(TOPICS, "is kaspa anonymous").title == "Privacy"
     vids = [line for t in TOPICS for line in t.answer.splitlines() if line.startswith("Video: ")]
-    assert len(vids) == 43 and all(v.startswith("Video: https://youtu.be/") for v in vids)
+    assert len(vids) == 48 and all(v.startswith("Video: https://youtu.be/") for v in vids)
     # the answer comes first, then videos, then the source
     fin = BY_TITLE["Pruning"].answer.splitlines()
     assert fin[-1].startswith("Source: ") and fin[-2].startswith("Video: ")
@@ -360,3 +360,75 @@ def test_forum_answers_cite_their_thread():
     cited = [t for t in TOPICS if "\nSource: https://kas-smiths.org/t/" in t.answer]
     assert len(cited) == 14
     assert "testnet-10 only" in BY_TITLE["Stablecoins"].answer
+
+
+@pytest.mark.parametrize("question", [
+    "who owns kaspa", "who controls kaspa", "is there a company behind kaspa", "who runs kaspa",
+    "is kaspa a company?", "who is the ceo of kaspa", "who funds kaspa development", "who is in charge of kaspa",
+    "is kaspa centralized",
+])
+def test_who_owns_kaspa(question):
+    assert best_topic(TOPICS, question).title == "Who owns Kaspa"
+
+
+def test_saying_kaspa_does_not_pick_addresses():
+    assert best_topic(TOPICS, "tell me something about kaspa") is None or \
+        best_topic(TOPICS, "tell me something about kaspa").title != "Addresses"
+
+
+@pytest.mark.parametrize("question,title", [
+    ("what is an ICO", "What is an ICO"),
+    ("what is an initial coin offering", "What is an ICO"),
+    ("did kaspa have an ICO?", "Fair launch"),
+    ("was there an ico", "Fair launch"),
+])
+def test_ico_questions(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("question", [
+    "what is a fair launch", "why is a fair launch important", "importance of fair launch",
+    "was kaspa fairly launched", "how were coins distributed",
+])
+def test_fair_launch_questions(question):
+    t = best_topic(TOPICS, question)
+    assert t.title == "Fair launch" and "That matters because" in t.answer
+
+
+@pytest.mark.parametrize("question,title", [
+    ("was kaspa premined", "Premine"),
+    ("what is a premine", "Premine"),
+    ("was there a premine", "Premine"),
+    ("what is the genesis block of kaspa", "Genesis block"),
+    ("what does the genesis block say", "Genesis block"),
+    ("what happened on black tuesday", "Genesis block"),
+])
+def test_premine_and_genesis(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("question", [
+    "what bible verse is in kaspa", "explain the bible verse in the kaspa code", "what is ezra 7:18",
+    "is there a verse in the genesis block",
+])
+def test_bible_verse(question):
+    t = best_topic(TOPICS, question)
+    assert t.title == "The Bible verse in the genesis block" and "Ezra 7:18" in t.answer
+
+
+@pytest.mark.parametrize("question", [
+    "is kaspa open source", "where is the source code", "what makes kaspa decentralized", "where is kaspa's github",
+    "how decentralized is kaspa",
+])
+def test_open_source(question):
+    t = best_topic(TOPICS, question)
+    assert t.title == "Open source and decentralization" and "github.com/kaspanet/rusty-kaspa" in t.answer
+
+
+@pytest.mark.parametrize("question", [
+    "where do the core devs talk", "is there a kaspa telegram", "where can I follow kaspa development",
+    "what are the devs working on",
+])
+def test_core_dev_telegram(question):
+    t = best_topic(TOPICS, question)
+    assert t.title == "Core developer discussions" and "https://t.me/kasparnd" in t.answer
