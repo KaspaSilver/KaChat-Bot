@@ -495,8 +495,12 @@ class Bot:
                 self.save()
                 return None
             d["n"] += 1
-        if not force:
+        if not force and self.HOURLY_LIMIT:
             self.data["outTimes"].append(now)
+        elif not self.HOURLY_LIMIT:
+            # No hourly limit (public bots' people, the answers bot): nothing to count, and the
+            # list would only grow in a file rewritten on every send (BOT-005).
+            self.data.pop("outTimes", None)
         try:
             txid = await self.ctx.send(self, recipient, text)
         except Exception as exc:

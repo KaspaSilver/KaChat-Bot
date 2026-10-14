@@ -331,3 +331,12 @@ def test_a_carried_over_owner_is_never_forgotten_for_not_agreeing(ctxf):
     ctxf.clock.t += 5 * 86400
     run(bot.tick(ctxf.clock.t))
     assert USER in bot.people and bot.people[USER].address_list() == [WATCH]
+
+
+def test_a_persons_file_does_not_grow_with_every_message(ctxf):
+    """BOT-005: no hourly limit for public people, so no per-message time list either."""
+    bot = host(ctxf)
+    start(bot, OTHER)
+    for _ in range(50):
+        say(bot, "help", OTHER)
+    assert "outTimes" not in bot.people[OTHER].data
