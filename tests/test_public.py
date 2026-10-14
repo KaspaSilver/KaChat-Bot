@@ -284,3 +284,50 @@ def test_real_payments_are_still_reported(ctxf):
     ctxf.clock.t += 10
     run(bot.tick(ctxf.clock.t))
     assert texts(ctxf, OTHER)[-1].startswith("Other bot sent 2.01 KAS")
+
+
+def test_people_who_never_agree_are_forgotten_after_a_day(ctxf):
+    bot = host(ctxf)
+    say(bot, "hi", OTHER)                                      # never agrees
+    start(bot, USER)                                           # agrees
+    ctxf.clock.t += 86400 + 3601
+    run(bot.tick(ctxf.clock.t))
+    assert OTHER not in bot.people and USER in bot.people
+
+
+def test_full_bot_makes_room_by_forgetting_someone_quiet_for_a_month(ctxf, monkeypatch):
+    import kachat.bots.public as public
+    monkeypatch.setattr(public, "MAX_PEOPLE", 2)
+    bot = host(ctxf)
+    start(bot, USER)
+    ctxf.clock.t += 40 * 86400
+    start(bot, OTHER)
+    newcomer = addr("66" * 32)
+    start(bot, newcomer)                                       # full: USER has been quiet 40 days
+    assert USER not in bot.people and newcomer in bot.people
+    assert texts(ctxf, newcomer)[-1].startswith("Thanks! I'm the KaChat")
+
+
+def test_full_of_active_people_says_so_once_a_day(ctxf, monkeypatch):
+    import kachat.bots.public as public
+    monkeypatch.setattr(public, "MAX_PEOPLE", 2)
+    bot = host(ctxf)
+    start(bot, USER)
+    start(bot, OTHER)
+    newcomer = addr("66" * 32)
+    say(bot, "hi", newcomer)
+    say(bot, "agree", newcomer)
+    say(bot, "agree", newcomer)
+    full = [t for t in texts(ctxf, newcomer) if t.startswith("Sorry, I'm full right now")]
+    assert len(full) == 1 and not bot.people[newcomer].data.get("agreedNotPrivate")
+    assert USER in bot.people and OTHER in bot.people
+
+
+def test_a_carried_over_owner_is_never_forgotten_for_not_agreeing(ctxf):
+    store = FakeStore()
+    store.data = {"owner": USER, "stage": "active", "seen": [], "createdAt": 1,
+                  "settings": {"address": WATCH, "minRewardKas": 0, "hashrateDropPct": None}}
+    bot = host(ctxf, store=store)
+    ctxf.clock.t += 5 * 86400
+    run(bot.tick(ctxf.clock.t))
+    assert USER in bot.people and bot.people[USER].address_list() == [WATCH]

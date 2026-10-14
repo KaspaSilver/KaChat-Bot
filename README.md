@@ -74,8 +74,9 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
 - Nobody uses a bot before agreeing that their messages are not private: the first reply to anyone, on every
   bot (Kaspa answers too), says so and asks them to reply `agree`, and is repeated until they do. A panel Reset
   asks everyone again.
-- Every bot answers anyone while it is switched on, with no limit per person or per hour (at most 1,000
-  people can use one bot). Its wallet balance is the only cap on its spending: keep only a few KAS in it.
+- Every bot answers anyone while it is switched on, with no limit per person or per hour (up to 5,000
+  people per bot; someone who never agreed is forgotten after a day, and when it is full someone quiet for 30
+  days makes room, or the newcomer is told it is full). Its wallet balance is the only cap on its spending: keep only a few KAS in it.
   (Each message someone sends it costs them a network fee too, about what the bot's reply costs.)
 - An address that is far too busy to message about (a mining pool's address gets a reward almost every block, an
   exchange's gets payments all the time) is dropped automatically: more than 20 new payments in a minute, or more

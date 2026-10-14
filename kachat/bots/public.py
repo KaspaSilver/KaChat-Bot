@@ -10,7 +10,12 @@ them): the first reply to anyone is NOT_PRIVATE_NOTICE, repeated until they answ
 person carried over from a paired bot is asked too, then continues where they were.
 
 Spending: there is no limit per person and no hourly limit (and so no limit question): every
-message is paid from the bot's wallet, and its balance is the only cap. At most MAX_PEOPLE people.
+message is paid from the bot's wallet, and its balance is the only cap.
+
+People (BOT-004): at most MAX_PEOPLE who have agreed. Someone who messaged but never agreed is
+forgotten after a day (and at most MAX_PENDING wait to agree at once). When a newcomer agrees
+with the bot full, the person quiet longest (nothing from them for IDLE_EVICT) makes room; if
+nobody is that quiet, the newcomer is told it is full, at most once a day.
 (`per_person_per_day` can still set a daily cap per person; the daemon passes none.)
 
 The pool hashrate (the panel's own stratum bridge) is the owner's, not a stranger's, so public
@@ -34,7 +39,12 @@ from .base import NOT_PRIVATE_NOTICE, Bot, BotContext, is_agree
 
 log = logging.getLogger("kachat.bot")
 
-MAX_PEOPLE = 1000
+MAX_PEOPLE = 5000                 # people who agreed
+MAX_PENDING = 2000                # people who messaged but have not agreed yet
+PENDING_FORGET = 86400            # a day: someone who never agreed is forgotten
+IDLE_EVICT = 30 * 86400           # quiet this long, a person may make room for a newcomer
+FULL_TEXT = ("Sorry, I'm full right now: I'm already looking after as many people as I can. "
+             "Please try again later.")
 DEFAULT_PER_PERSON = None        # messages one person may get per day (None = no limit)
 
 
@@ -117,8 +127,8 @@ class PublicHost(Bot):
         p = self.people.get(sender)
         if p is not None or not create:
             return p
-        if len(self.people) >= MAX_PEOPLE:
-            return None
+        if sum(1 for q in self.people.values() if not q.data.get("agreedNotPrivate")) >= MAX_PENDING:
+            return None                  # too many waiting to agree: nothing new until they age out
         ctx = dataclasses.replace(self.ctx, fetch_hashrate=None)
         p = self.cls(self._person_cfg(), PersonStore(self, sender), ctx)
         p.HOURLY_LIMIT = False
@@ -186,6 +196,49 @@ class PublicHost(Bot):
     def reset_owner(self) -> None:
         self._forget_everyone()
 
+    def _forget(self, sender: str) -> None:
+        """One person gone: their conversation, settings and file."""
+        p = self.people.pop(sender, None)
+        key = person_key(sender)
+        self.data["people"].pop(key, None)
+        self.memory.pop(key, None)
+        path = getattr(p.store, "data_path", None) if p else None
+        if path:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    def _agreed_count(self) -> int:
+        return sum(1 for p in self.people.values() if p.data.get("agreedNotPrivate"))
+
+    def _last_heard(self, p: Bot) -> int:
+        return int(max(p.data.get("lastInAt") or 0, p.data.get("agreedNotPrivate") or 0, p.data.get("createdAt") or 0))
+
+    def _make_room(self, now: float) -> bool:
+        """Room for one more agreed person: under the cap, or the quietest idle one forgotten."""
+        if self._agreed_count() < MAX_PEOPLE:
+            return True
+        idle = [(self._last_heard(p), who) for who, p in self.people.items()
+                if p.data.get("agreedNotPrivate") and now - self._last_heard(p) >= IDLE_EVICT]
+        if not idle:
+            return False
+        _, who = min(idle)
+        log.info("[%s] full: %s (quiet longest) makes room for a newcomer", self.id, who)
+        self._forget(who)
+        return True
+
+    def _forget_pending(self, now: float) -> None:
+        """People who messaged but never agreed, once a day has passed."""
+        # Someone with a setup (carried over from a paired bot) is never forgotten for this.
+        stale = [who for who, p in self.people.items()
+                 if not p.data.get("agreedNotPrivate") and p.owner is None
+                 and now - (p.data.get("createdAt") or now) >= PENDING_FORGET]
+        for who in stale:
+            self._forget(who)
+        if stale:
+            self.save()
+
     # ── messages ────────────────────────────────────────────────────────────
 
     async def handle_message(self, sender: str, text: str, txid: str, ts: Optional[float] = None) -> None:
@@ -219,8 +272,17 @@ class PublicHost(Bot):
                 p.store.append_history("out", NOT_PRIVATE_NOTICE, sent, ts)
             p.save()
             return
+        if not self._make_room(self.ctx.clock()):
+            # Full of active people: say so (once a day each) rather than go quiet.
+            day = int(self.ctx.clock() // 86400)
+            if p.data.get("fullNoticeDay") != day:
+                p.data["fullNoticeDay"] = day
+                await p.send_to(sender, FULL_TEXT)
+            p.save()
+            return
         p.data["agreedNotPrivate"] = int(ts)
         p.save()
+        self.save()
         if p.owner is None:
             await p._pair(sender, text, txid, ts, intro=f"Thanks! I'm the KaChat {self.TITLE}. ")
         else:
@@ -246,6 +308,9 @@ class PublicHost(Bot):
             await self.check_low_balance(now)
         except Exception:
             log.exception("[%s] low-balance notice failed", self.id)
+        if now - getattr(self, "_pending_swept", 0) >= 3600:
+            self._pending_swept = now
+            self._forget_pending(now)
         for p in list(self.people.values()):
             try:
                 await p.tick(now)
