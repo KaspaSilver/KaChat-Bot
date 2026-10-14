@@ -65,8 +65,8 @@ async def send_direct(cfg: dict, bot_id: str, text: str, to: Optional[str] = Non
     backend = KaspaSdkBackend(cfg["wrpc_url"], cfg["network"])
     senders = {}
 
-    async def send(bot, recipient, t):
-        return await senders[bot.id].send(recipient, t)
+    async def send(bot, recipient, t, first_contact=False):
+        return await senders[bot.id].send(recipient, t, first_contact=first_contact)
 
     async def no_balance(_):
         return None
@@ -84,7 +84,7 @@ async def send_direct(cfg: dict, bot_id: str, text: str, to: Optional[str] = Non
                 to = validate_address(to.strip().lower(), cfg["network"], require_pubkey=True)
             except AddressError as exc:
                 return {"ok": False, "txid": None, "error": f"bad address: {exc}"}
-            txid = await bot.send_to(to, text)
+            txid = await bot.send_to(to, text, first_contact=to not in bot.known_senders())
         elif not bot.owner:
             return {"ok": False, "txid": None, "error": "bot has no owner, and no address to send to"}
         else:

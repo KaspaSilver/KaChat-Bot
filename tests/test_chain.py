@@ -288,3 +288,26 @@ def test_disabled_and_removed_bots(tmp_path):
         assert d.bots == {}
     asyncio.run(go())
 
+
+
+def test_panel_alert_to_someone_who_never_wrote_is_a_first_contact(tmp_path):
+    """BOT-006: an untagged message from an unknown sender never shows in KaChat; the alert must be a dm."""
+    from kachat.alias import inbox_tag
+
+    async def go():
+        d, node, be = make_daemon(tmp_path)
+        d.reload_config()
+        loop = asyncio.get_running_loop()
+        fut = loop.run_in_executor(None, lambda: outbox_send(str(tmp_path / "state"), "mining-1", "Alert: low", 10, to=USER))
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            await d.process_outbox()
+            if fut.done():
+                break
+        assert (await fut)["ok"]
+        cp = parse_payload(be.submitted[-1]["payload"].encode())
+        assert cp.kind == "dm" and cp.tag == inbox_tag(USER)
+        assert open_sealed(cp.sealed, USER_KEY) == "Alert: low"
+        for t in d.workers.values():
+            t.cancel()
+    asyncio.run(go())

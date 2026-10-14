@@ -469,7 +469,7 @@ class Bot:
             await self.send_to(self.owner, "OK. I'll wait until the hour has passed, then send again.", force=True)
         return True
 
-    async def send_to(self, recipient: str, text: str, force: bool = False) -> Optional[str]:
+    async def send_to(self, recipient: str, text: str, force: bool = False, first_contact: bool = False) -> Optional[str]:
         """Sends one message if the rate limit allows; returns the txid or None.
         `force` is only for the limit question and its answer (at most two a full hour)."""
         if not self.enabled:
@@ -502,7 +502,10 @@ class Bot:
             # list would only grow in a file rewritten on every send (BOT-005).
             self.data.pop("outTimes", None)
         try:
-            txid = await self.ctx.send(self, recipient, text)
+            # First contact (kchat:1:dm: with their inbox tag) for someone who never wrote to this
+            # bot: an untagged message from an unknown sender never shows in their app (BOT-006).
+            txid = await (self.ctx.send(self, recipient, text, first_contact=True) if first_contact
+                          else self.ctx.send(self, recipient, text))
         except Exception as exc:
             self.error = f"Could not send: {exc}"
             log.warning("[%s] send failed: %s", self.id, exc)

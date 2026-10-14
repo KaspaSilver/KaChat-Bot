@@ -86,8 +86,8 @@ class Daemon:
             on_change=lambda bot: self.dirty.add(bot.id),
         )
 
-    async def _send(self, bot: Bot, recipient: str, text: str) -> str:
-        txid = await self.senders[bot.id].send(recipient, text)
+    async def _send(self, bot: Bot, recipient: str, text: str, first_contact: bool = False) -> str:
+        txid = await self.senders[bot.id].send(recipient, text, first_contact=first_contact)
         owner = self.bots.get(bot.id, bot)          # a public bot's person shares its host's wallet
         asyncio.get_running_loop().call_later(5, lambda: asyncio.ensure_future(self._refresh_balance(owner)))
         return txid
@@ -487,7 +487,9 @@ class Daemon:
                         to = validate_address(to, self.network, require_pubkey=True)
                     except AddressError as exc:
                         to, res["error"] = None, f"bad address: {exc}"
-                txid = (await bot.send_to(to, text) if to else None) if req.get("to") else await bot.say(text)
+                # The panel's alerts go to its owner's address, who may never have written to this bot.
+                first = bool(to) and to not in bot.known_senders()
+                txid = (await bot.send_to(to, text, first_contact=first) if to else None) if req.get("to") else await bot.say(text)
                 res.update(ok=bool(txid), txid=txid, error=None if txid else (res["error"] or bot.error or "not sent"))
             atomic_write_json(result_path, res)
 

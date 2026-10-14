@@ -84,6 +84,7 @@ class FakeCtxFactory:
         self.balance = 5_000_000_000
         self.price = None
         self.self_sends = {}
+        self.first_contacts = []
         self.market = None
         self.hashrate = None
         self.spenders = {}
@@ -91,7 +92,9 @@ class FakeCtxFactory:
     def make(self, max_out=30):
         from kachat.bots import BotContext
 
-        async def send(bot, recipient, text):
+        async def send(bot, recipient, text, first_contact=False):
+            if first_contact:
+                self.first_contacts.append(recipient)
             if self.fail:
                 raise RuntimeError("node down")
             self.sent.append((bot.id, recipient, text))
