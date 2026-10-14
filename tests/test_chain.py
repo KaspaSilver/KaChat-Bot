@@ -3,6 +3,7 @@ against proto/), and the daemon end to end with a fake node and SDK backend."""
 import asyncio
 import json
 import os
+import time
 
 import rpc_pb2
 from conftest import BOT_KEY, OTHER_KEY, USER_KEY, FakeBackend, addr
@@ -267,6 +268,7 @@ def test_outbox_and_utxo_dispatch(tmp_path):
         await d.dispatch_utxos({addr("44" * 32): ([{"address": addr("44" * 32), "txid": "c0" * 32, "index": 0,
                                                      "amount": 400_000_000, "isCoinbase": True,
                                                      "blockDaaScore": 5}], [])})
+        await bot.tick(time.time() + 4)                     # rewards are reported once settled
         assert replies(be)[-1][1].startswith("Block reward: 4 KAS")
         assert os.listdir(tmp_path / "state" / "botd" / "outbox") == []
         for t in d.workers.values():

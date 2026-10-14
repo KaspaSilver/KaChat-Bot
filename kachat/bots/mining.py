@@ -14,6 +14,13 @@ from ..address import short_address
 from .base import MAX_WATCHED, Bot, Question, fmt_hashrate, fmt_kas, parse_address_list, parse_number
 
 HASHRATE_POLL = 60.0
+# At 10 blocks a second the chain block that pays a mined block's reward is sometimes replaced
+# (a short reorg), and the same reward is then paid again in another coinbase: a new txid. So a
+# new reward waits REWARD_SETTLE seconds before it is reported (one taken away meanwhile is
+# dropped), and one paid again within REPAID_WINDOW of a reported one being taken away, for the
+# same amount on the same address, is that same reward and is not reported twice.
+REWARD_SETTLE = 3.0
+REPAID_WINDOW = 10.0
 HASHRATE_WINDOW = 30 * 60      # baseline = average over the last 30 minutes before a drop
 
 
@@ -26,6 +33,8 @@ class MiningBot(Bot):
         self._hr_samples: List[tuple] = []
         self._hr_last_poll = 0.0
         self._hr_low_count = 0
+        self._pending: List[tuple] = []     # (time, address, amount, key): rewards not reported yet
+        self._orphans: List[tuple] = []     # (time, address, amount): reported rewards taken away
         super().__init__(*a, **kw)
 
     def default_settings(self) -> dict:
@@ -103,23 +112,52 @@ class MiningBot(Bot):
         s = self.settings
         if address not in self.address_list() or self.stage != "active":
             return
+        now = self.ctx.clock()
+        self._orphans = [o for o in self._orphans if now - o[0] < REPAID_WINDOW]
+        # A reward taken away: dropped if not reported yet, remembered if it was (its re-payment
+        # comes back as a new coin of the same amount).
+        for e in removed:
+            if not e.get("isCoinbase"):
+                continue
+            key = f"reward:{e['txid']}:{e['index']}"
+            before = len(self._pending)
+            self._pending = [p for p in self._pending if p[3] != key]
+            if len(self._pending) == before and self.seen(key):
+                self._orphans.append((now, address, int(e["amount"])))
         min_sompi = int(round(float(s.get("minRewardKas") or 0) * 100_000_000))
-        rewards = []
         for e in added:
             if not e.get("isCoinbase") or e["amount"] <= 0 or e["amount"] < min_sompi:
                 continue
             key = f"reward:{e['txid']}:{e['index']}"
-            if self.seen(key):
+            if self.seen(key) or any(p[3] == key for p in self._pending):
                 continue
-            self.mark_seen(key)
-            rewards.append(e["amount"])
-        if not rewards:
+            match = next((o for o in self._orphans if o[1] == address and o[2] == int(e["amount"])), None)
+            if match:
+                # The same reward paid again after a reorg: already reported.
+                self._orphans.remove(match)
+                self.mark_seen(key)
+                continue
+            self._pending.append((now, address, int(e["amount"]), key))
+
+    async def report_rewards(self, now: float) -> None:
+        """Rewards that have settled, one message per address."""
+        ready = [p for p in self._pending if now - p[0] >= REWARD_SETTLE]
+        if not ready:
             return
-        balance = await self.ctx.get_balance(address)
-        hashrate = await self.ctx.fetch_hashrate() if self.ctx.fetch_hashrate else None
-        await self.notify(self.reward_text(rewards, balance, hashrate, address))
+        self._pending = [p for p in self._pending if now - p[0] < REWARD_SETTLE]
+        by_addr: dict = {}
+        watching = set(self.address_list())
+        for _, address, amount, key in ready:
+            self.mark_seen(key)
+            if address in watching:              # not one dropped meanwhile (too busy, removed)
+                by_addr.setdefault(address, []).append(amount)
+        for address, rewards in by_addr.items():
+            balance = await self.ctx.get_balance(address)
+            hashrate = await self.ctx.fetch_hashrate() if self.ctx.fetch_hashrate else None
+            await self.notify(self.reward_text(rewards, balance, hashrate, address))
 
     async def tick(self, now: float) -> None:
+        await self.report_rewards(now)
         drop = self.settings.get("hashrateDropPct")
         if drop is None or self.stage != "active" or not self.ctx.fetch_hashrate:
             return

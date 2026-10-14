@@ -225,19 +225,53 @@ def _entry(txid, amount, coinbase=True, index=0):
             "blockDaaScore": 1}
 
 
+def settle(bot, ctxf):
+    """Rewards are reported once they have settled (a few seconds), on the next tick."""
+    ctxf.clock.t += 4
+    run(bot.tick(ctxf.clock.t))
+
+
 def test_mining_rewards(make_bot, ctxf):
     bot = paired(make_bot, ctxf, "mining", [WATCH, "1", "no"])
     ctxf.hashrate = 2500.0
     run(bot.on_utxos(WATCH, [_entry("a" * 64, 387_000_000)], []))
+    assert ctxf.sent == []                                  # settling
+    settle(bot, ctxf)
     msg = texts(ctxf)[-1]
     assert "Block reward: 3.87 KAS" in msg and "Balance: 50 KAS" in msg and "2.50 TH/s" in msg
     run(bot.on_utxos(WATCH, [_entry("a" * 64, 387_000_000)], []))      # same outpoint again
     run(bot.on_utxos(WATCH, [_entry("b" * 64, 50_000_000)], []))       # under minRewardKas
     run(bot.on_utxos(WATCH, [_entry("c" * 64, 900_000_000, coinbase=False)], []))  # not a reward
+    settle(bot, ctxf)
     assert len(ctxf.sent) == 1
     bot.data["stage"] = "paused"
     run(bot.on_utxos(WATCH, [_entry("d" * 64, 387_000_000)], []))
+    settle(bot, ctxf)
     assert len(ctxf.sent) == 1
+
+
+def test_a_reward_paid_again_after_a_reorg_is_reported_once(make_bot, ctxf):
+    """At 10 BPS the chain block paying a reward can be replaced: the same reward, a new txid."""
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    first = _entry("a" * 64, 387_000_000)
+    run(bot.on_utxos(WATCH, [first], []))
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 1
+    # reported, then reorged out and paid again in another coinbase (one notification)
+    run(bot.on_utxos(WATCH, [_entry("b" * 64, 387_000_000)], [first]))
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 1
+    # reorged before it was reported: only the replacement is reported
+    pending = _entry("c" * 64, 412_000_000)
+    run(bot.on_utxos(WATCH, [pending], []))
+    run(bot.on_utxos(WATCH, [_entry("d" * 64, 412_000_000)], [pending]))
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 2
+    # a genuinely new reward of the same amount, later, is reported
+    ctxf.clock.t += 60
+    run(bot.on_utxos(WATCH, [_entry("e" * 64, 387_000_000)], []))
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 3
 
 
 def test_mining_hashrate_drop(make_bot, ctxf):
@@ -451,6 +485,7 @@ def test_mining_add_and_reward_names_the_address(make_bot, ctxf):
     assert texts(ctxf)[-1] == f"Added {short_address(WATCH2)}. Now watching 2 addresses."
     assert bot.watched_addresses() == {WATCH, WATCH2}
     run(bot.on_utxos(WATCH2, [_entry("f" * 64, 387_000_000)], []))
+    settle(bot, ctxf)
     msg = texts(ctxf)[-1]
     assert msg.startswith(short_address(WATCH2) + "\nBlock reward: 3.87 KAS")
     say(bot, "help")

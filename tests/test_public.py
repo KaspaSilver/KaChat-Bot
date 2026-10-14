@@ -164,10 +164,13 @@ def test_a_pool_address_is_dropped_with_a_message(ctxf):
     for i in range(40):                                        # a reward every second: a pool
         run(bot.on_utxos(POOL, [_coin(i + 1, POOL)], []))
         ctxf.clock.t += 1
+        run(bot.tick(ctxf.clock.t))
     got = texts(ctxf, OTHER)[before:]
-    assert got[-1].startswith("I stopped watching") and "does not have this much activity" in got[-1]
+    stop = [i for i, t in enumerate(got) if t.startswith("I stopped watching")]
+    assert len(stop) == 1 and stop[0] == len(got) - 1         # the last message, then silence
+    assert "does not have this much activity" in got[-1]
     assert "more than 20 payments in a minute" in got[-1] and "Send add" in got[-1]
-    assert len(got) == 21                                      # 20 rewards, then the message, then silence
+    assert sum(t.count("block reward") + t.count("Block reward") for t in got) >= 1
     assert bot.people[OTHER].address_list() == [WATCH]
     assert POOL not in bot.watched_addresses() and WATCH in bot.watched_addresses()
 
@@ -213,10 +216,13 @@ def test_reorg_churn_and_spends_do_not_count_as_payments(ctxf):
     for _ in range(30):                                        # the same reward removed and re-added
         run(bot.on_utxos(WATCH, [coin], []))
         run(bot.on_utxos(WATCH, [], [coin]))
+    run(bot.on_utxos(WATCH, [coin], []))                       # ...and in the end it stays
     for i in range(30):                                        # the owner spending from the address
         run(bot.on_utxos(WATCH, [], [_coin(100 + i, WATCH)]))
     for i in range(30):                                        # change outputs are not rewards
         run(bot.on_utxos(WATCH, [_coin(200 + i, WATCH, coinbase=False)], []))
+    ctxf.clock.t += 4
+    run(bot.tick(ctxf.clock.t))
     assert bot.people[OTHER].address_list() == [WATCH]
     assert not any("stopped watching" in t for t in texts(ctxf, OTHER))
     assert sum("Block reward" in t for t in texts(ctxf, OTHER)) == 1     # one reward, one message
