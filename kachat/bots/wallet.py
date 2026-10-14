@@ -21,6 +21,7 @@ from ..address import short_address
 from .base import MAX_WATCHED, AnswerError, Bot, Question, fmt_kas, parse_address_list, parse_number
 
 SETTLE = 4.0
+SELF_SEND_MAX_SOMPI = 1_000_000      # 0.01 KAS: the fee of a self-send, never a real payment
 MAX_NICKNAME = 32
 NO_NICKNAME = ("none", "no", "nothing", "n/a")
 
@@ -126,7 +127,23 @@ class WalletBot(Bot):
             r.extend(removed)
         for addr, (added, removed) in by_addr.items():
             for txid, net in self.net_by_tx(added, removed):
+                if self.is_self_send(txid, net, added, removed):
+                    continue
                 await self.report(addr, txid, net)
+
+    def is_self_send(self, txid: Optional[str], net: int, added: list, removed: list) -> bool:
+        """A transaction that only paid its own address back: a bot's message, a wallet compound.
+        Nothing moved anywhere, so it is never reported. Without that, two public wallet bots
+        watching each other's address report each other's messages forever (BOT-001). Exact when
+        the chain follower has seen the transaction; otherwise a change that both spent from and
+        paid back to the address and moved under 0.01 KAS is taken as one."""
+        if not txid:
+            return False
+        known = self.ctx.self_send_of(txid)
+        if known is not None:
+            return known
+        spent_back = any(e.get("txid") == txid for e in added) and bool(removed)
+        return spent_back and net < 0 and -net < SELF_SEND_MAX_SOMPI
 
     def net_by_tx(self, added: list, removed: list) -> List[tuple]:
         """[(txid or None, net sompi)] for one address, in a stable order."""

@@ -121,6 +121,9 @@ class BotContext:
     fetch_hashrate: Optional[Callable] = None   # async () -> GH/s | None
     fetch_market: Optional[Callable] = None     # async () -> feeds.fetch_market() dict | None
     spender_of: Callable[[str], Optional[str]] = lambda key: None
+    # True when a transaction (txid) only pays its own address back: a bot message or a wallet
+    # compound, not a payment; None when the chain follower has not seen it.
+    self_send_of: Callable[[str], Optional[bool]] = lambda txid: None
     max_out_per_hour: int = DEFAULT_MAX_OUT_PER_HOUR
     on_change: Callable = lambda bot: None  # status changed -> write it
 

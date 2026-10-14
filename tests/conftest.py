@@ -83,6 +83,7 @@ class FakeCtxFactory:
         self.clock = Clock()
         self.balance = 5_000_000_000
         self.price = None
+        self.self_sends = {}
         self.market = None
         self.hashrate = None
         self.spenders = {}
@@ -110,7 +111,8 @@ class FakeCtxFactory:
 
         return BotContext(network=NET, send=send, get_balance=get_balance, clock=self.clock,
                           fetch_price=fetch_price, fetch_hashrate=fetch_hashrate, fetch_market=fetch_market,
-                          spender_of=lambda k: self.spenders.get(k), max_out_per_hour=max_out)
+                          spender_of=lambda k: self.spenders.get(k), self_send_of=lambda t: self.self_sends.get(t),
+                          max_out_per_hour=max_out)
 
 
 def make_cfg(bot_type="mining", key=BOT_KEY, code="482915", enabled=True, reset=None, bid=None, reset_settings=None):

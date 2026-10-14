@@ -228,3 +228,59 @@ def test_a_lucky_burst_from_a_home_miner_is_kept(ctxf):
         run(bot.on_utxos(WATCH, [_coin(i + 1, WATCH)], []))
         ctxf.clock.t += 5
     assert bot.people[OTHER].address_list() == [WATCH]
+
+
+def _out(txid, amount, address, index=0):
+    return {"address": address, "txid": txid, "index": index, "amount": amount, "isCoinbase": False, "blockDaaScore": 1}
+
+
+def _wallet_watching(ctxf, watch):
+    bot = host(ctxf, "wallet")
+    start(bot, OTHER)
+    say(bot, watch, OTHER)
+    say(bot, "Other bot", OTHER)
+    say(bot, "0", OTHER)
+    return bot
+
+
+def test_another_bots_messages_are_never_reported(ctxf):
+    """BOT-001: a wallet bot watching another bot's address must not report that bot's messages."""
+    W2 = addr("99" * 32)
+    bot = _wallet_watching(ctxf, W2)
+    before = len(texts(ctxf, OTHER))
+    coin = _out("a" * 64, 50_000_000, W2)
+    for i in range(30):                                        # 30 messages from W2: each spends its coin...
+        nxt = _out(f"{i + 1:064x}", coin["amount"] - 198_000, W2)
+        ctxf.self_sends[nxt["txid"]] = True                    # ...and pays only W2 back (the chain says so)
+        ctxf.spenders[f"{coin['txid']}:0"] = nxt["txid"]
+        run(bot.on_utxos(W2, [nxt], [coin]))
+        ctxf.clock.t += 10
+        run(bot.tick(ctxf.clock.t))
+        coin = nxt
+    assert len(texts(ctxf, OTHER)) == before                   # silence: no loop can start
+
+
+def test_a_self_send_the_chain_has_not_shown_yet_is_still_skipped(ctxf):
+    W2 = addr("99" * 32)
+    bot = _wallet_watching(ctxf, W2)
+    before = len(texts(ctxf, OTHER))
+    run(bot.on_utxos(W2, [_out("b" * 64, 49_802_000, W2)], [_out("a" * 64, 50_000_000, W2)]))
+    ctxf.spenders[f"{'a' * 64}:0"] = "b" * 64
+    ctxf.clock.t += 10
+    run(bot.tick(ctxf.clock.t))
+    assert len(texts(ctxf, OTHER)) == before
+
+
+def test_real_payments_are_still_reported(ctxf):
+    W2 = addr("99" * 32)
+    bot = _wallet_watching(ctxf, W2)
+    run(bot.on_utxos(W2, [_out("c" * 64, 300_000_000, W2)], []))       # a payment in
+    ctxf.clock.t += 10
+    run(bot.tick(ctxf.clock.t))
+    assert texts(ctxf, OTHER)[-1].startswith("Other bot received 3 KAS")
+    ctxf.self_sends["d" * 64] = False                                    # a payment out, change back
+    ctxf.spenders[f"{'c' * 64}:0"] = "d" * 64
+    run(bot.on_utxos(W2, [_out("d" * 64, 99_000_000, W2)], [_out("c" * 64, 300_000_000, W2)]))
+    ctxf.clock.t += 10
+    run(bot.tick(ctxf.clock.t))
+    assert texts(ctxf, OTHER)[-1].startswith("Other bot sent 2.01 KAS")

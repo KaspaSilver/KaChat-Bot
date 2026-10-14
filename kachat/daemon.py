@@ -55,6 +55,7 @@ class Daemon:
         self.watcher = ConfigWatcher(conf_path)
         self.bots: Dict[str, Bot] = {}
         self._price_cache: Dict[str, tuple] = {}
+        self.self_sends: "collections.OrderedDict[str, bool]" = collections.OrderedDict()
         self.senders: Dict[str, MessageSender] = {}
         self.queues: Dict[str, asyncio.Queue] = {}
         self.workers: Dict[str, asyncio.Task] = {}
@@ -80,6 +81,7 @@ class Daemon:
             fetch_market=self._market,
             fetch_hashrate=self._hashrate if self.bridge_url else None,
             spender_of=lambda key: self.spenders.get(key),
+            self_send_of=lambda txid: self.self_sends.get(txid),
             max_out_per_hour=self.max_out_per_hour,
             on_change=lambda bot: self.dirty.add(bot.id),
         )
@@ -238,6 +240,12 @@ class Daemon:
                     self.spenders[key] = ct.txid
                     while len(self.spenders) > 5000:
                         self.spenders.popitem(last=False)
+                    # A tx whose every input and output is one address moved nothing anywhere: a
+                    # bot's message or a wallet compound (BOT-001: wallet bots must not report it).
+                    addrs = {a for (_, _, a, _) in ct.inputs} | {a for (a, _) in ct.outputs}
+                    self.self_sends[ct.txid] = len(addrs) == 1 and None not in addrs
+                    while len(self.self_sends) > 5000:
+                        self.self_sends.popitem(last=False)
         if is_chat_payload_hex(ct.payload_hex):
             sender = ct.sender
             if sender:
