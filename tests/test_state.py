@@ -93,3 +93,13 @@ def test_reset_owner_through_real_store(tmp_path):
     bot2 = make_bot(make_cfg("mining", reset="r1"), store, f.make(), public=False)
     assert bot2.owner is None and not os.path.exists(store.history_path)
     assert read_json(store.data_path)["resetOwnerSeen"] == "r1"
+
+
+def test_each_network_keeps_its_own_state_folder():
+    """BOT-007: mainnet stays in the state folder itself, testnet-10 gets its own."""
+    import importlib.util, os, sys
+    spec = importlib.util.spec_from_file_location("botd", os.path.join(os.path.dirname(__file__), "..", "botd.py"))
+    botd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(botd)
+    assert botd.state_dir_for("/state", "mainnet") == "/state"
+    assert botd.state_dir_for("/state", "testnet-10") == "/state/testnet-10"

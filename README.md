@@ -117,6 +117,7 @@ file and rebuild to change the answers. The on/off switch stops it; Reset starts
 | `/state/bots/<id>.json` | each bot's status for the panel |
 | `/state/bots/<id>.history.jsonl` | the conversation, last 500 messages |
 | `/state/botd/` | the daemon's own state (chain checkpoint; each bot's people in `<id>.json`, each person's settings in `<id>/<key>.json`) |
+| `/state/testnet-10/…` | the same layout for testnet-10: each network keeps its own people, settings and history |
 
 `/conf/bots.json`:
 

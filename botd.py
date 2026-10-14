@@ -38,11 +38,18 @@ logging.basicConfig(
 log = logging.getLogger("botd")
 
 
+def state_dir_for(base: str, network: str) -> str:
+    """Each network keeps its own people, settings and history (BOT-007): mainnet in the state
+    folder itself (where it always was), any other network in a folder of its own name."""
+    return base if network == "mainnet" else os.path.join(base, network)
+
+
 def env_config() -> dict:
+    network = os.environ.get("KASPA_NETWORK", "mainnet")
     return {
         "conf_path": os.environ.get("BOTS_CONF", "/conf/bots.json"),
-        "state_dir": os.environ.get("STATE_DIR", "/state"),
-        "network": os.environ.get("KASPA_NETWORK", "mainnet"),
+        "state_dir": state_dir_for(os.environ.get("STATE_DIR", "/state"), network),
+        "network": network,
         "grpc_target": os.environ.get("NODE_GRPC", "kaspad:16110"),
         "wrpc_url": os.environ.get("NODE_WRPC", "ws://kaspad:17110"),
         "indexer_url": os.environ.get("KACHAT_INDEXER_URL", "").strip(),
