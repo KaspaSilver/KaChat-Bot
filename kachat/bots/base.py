@@ -124,6 +124,8 @@ class BotContext:
     # True when a transaction (txid) only pays its own address back: a bot message or a wallet
     # compound, not a payment; None when the chain follower has not seen it.
     self_send_of: Callable[[str], Optional[bool]] = lambda txid: None
+    # When the chain follower last saw a reorg (unix s), or None when there is no follower to ask.
+    last_reorg_at: Callable[[], Optional[float]] = lambda: None
     max_out_per_hour: int = DEFAULT_MAX_OUT_PER_HOUR
     on_change: Callable = lambda bot: None  # status changed -> write it
 

@@ -125,6 +125,9 @@ class ChainFollower:
         self.poll_seconds = poll_seconds
         self.min_confirmations = min_confirmations
         self.on_status = on_status or (lambda err: None)
+        # When the follower last saw chain blocks removed (a reorg), unix seconds; 0 = not yet.
+        # The mining bot uses it to tell a reward paid again after a reorg from one spent (BOT-013).
+        self.last_reorg_at = 0.0
 
     async def step(self, start: str) -> str:
         """One VSPC round from `start`; returns the new checkpoint."""
@@ -133,6 +136,7 @@ class ChainFollower:
             # A reorg. Transactions those blocks accepted are normally accepted again
             # by the new chain blocks; handling is idempotent per txid, so nothing to undo.
             log.info("chain reorg: %d chain block(s) removed", len(resp.removedChainBlockHashes))
+            self.last_reorg_at = time.time()
         for block in resp.chainBlockAcceptedTransactions:
             hdr = block.chainBlockHeader
             bhash = hdr.hash if hdr.HasField("hash") else ""

@@ -60,6 +60,7 @@ class Daemon:
         self.self_sends: "collections.OrderedDict[str, bool]" = collections.OrderedDict()
         self._outbox_done: set = set()
         self._ticks: Dict[str, "asyncio.Future"] = {}
+        self._follower = None
         self.senders: Dict[str, MessageSender] = {}
         self.queues: Dict[str, asyncio.Queue] = {}
         self.workers: Dict[str, asyncio.Task] = {}
@@ -86,6 +87,7 @@ class Daemon:
             fetch_hashrate=self._hashrate if self.bridge_url else None,
             spender_of=lambda key: self.spenders.get(key),
             self_send_of=lambda txid: self.self_sends.get(txid),
+            last_reorg_at=lambda: self._follower.last_reorg_at if self._follower else None,
             max_out_per_hour=self.max_out_per_hour,
             on_change=lambda bot: self.dirty.add(bot.id),
         )
@@ -283,6 +285,7 @@ class Daemon:
         follower = ChainFollower(self.node, self.prefix, self._load_checkpoint, self._save_checkpoint,
                                  self.on_chain_tx, self.want_tx, poll_seconds=self.chain_poll,
                                  on_status=self._set_node_error)
+        self._follower = follower
         await follower.run()
 
     def watched_union(self) -> frozenset:

@@ -21,6 +21,11 @@ HASHRATE_POLL = 60.0
 # same amount on the same address, is that same reward and is not reported twice.
 REWARD_SETTLE = 3.0
 REPAID_WINDOW = 10.0
+# A reported reward taken away counts as reorged only if the chain follower saw a reorg around
+# then (BOT-013): otherwise it was spent (the miner moving or compounding it), and a new reward
+# of the same amount is a new reward. Checked when the new one has settled, since the coin change
+# can reach the bot a moment before the follower polls.
+REORG_SLACK = 5.0
 HASHRATE_WINDOW = 30 * 60      # baseline = average over the last 30 minutes before a drop
 
 
@@ -113,7 +118,7 @@ class MiningBot(Bot):
         if address not in self.address_list() or self.stage != "active":
             return
         now = self.ctx.clock()
-        self._orphans = [o for o in self._orphans if now - o[0] < REPAID_WINDOW]
+        self._orphans = [o for o in self._orphans if now - o[0] < REPAID_WINDOW + REWARD_SETTLE]
         # A reward taken away: dropped if not reported yet, remembered if it was (its re-payment
         # comes back as a new coin of the same amount).
         for e in removed:
@@ -131,13 +136,18 @@ class MiningBot(Bot):
             key = f"reward:{e['txid']}:{e['index']}"
             if self.seen(key) or any(p[3] == key for p in self._pending):
                 continue
-            match = next((o for o in self._orphans if o[1] == address and o[2] == int(e["amount"])), None)
-            if match:
-                # The same reward paid again after a reorg: already reported.
-                self._orphans.remove(match)
-                self.mark_seen(key)
-                continue
             self._pending.append((now, address, int(e["amount"]), key))
+
+    def _repaid(self, t: float, address: str, amount: int) -> bool:
+        """This new reward is a reported one paid again after a reorg (and is consumed as such)."""
+        match = next((o for o in self._orphans if o[1] == address and o[2] == amount and abs(t - o[0]) < REPAID_WINDOW), None)
+        if match is None:
+            return False
+        reorg = self.ctx.last_reorg_at()
+        if reorg is not None and reorg < match[0] - REORG_SLACK:
+            return False                     # no reorg around then: that reward was spent
+        self._orphans.remove(match)
+        return True
 
     async def report_rewards(self, now: float) -> None:
         """Rewards that have settled, one message per address."""
@@ -147,8 +157,10 @@ class MiningBot(Bot):
         self._pending = [p for p in self._pending if now - p[0] < REWARD_SETTLE]
         by_addr: dict = {}
         watching = set(self.address_list())
-        for _, address, amount, key in ready:
+        for t, address, amount, key in ready:
             self.mark_seen(key)
+            if self._repaid(t, address, amount):
+                continue                         # the same reward paid again after a reorg
             if address in watching:              # not one dropped meanwhile (too busy, removed)
                 by_addr.setdefault(address, []).append(amount)
         for address, rewards in by_addr.items():

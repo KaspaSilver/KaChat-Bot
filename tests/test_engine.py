@@ -663,3 +663,22 @@ def test_owner_says_no_and_the_bot_waits(make_bot, ctxf):
     ctxf.clock.t += 3601
     say(bot, "status")
     assert texts(ctxf)[-1].startswith("Active")
+
+
+def test_spending_a_reward_is_not_mistaken_for_a_reorg(make_bot, ctxf):
+    """BOT-013: with the follower saying no reorg happened, a reward spent and a new one of the
+    same amount within seconds are two rewards; with a reorg they are one."""
+    bot = paired(make_bot, ctxf, "mining", [WATCH, "0", "no"])
+    ctxf.last_reorg = 0.0                                     # the follower has seen no reorg
+    first = _entry("a" * 64, 387_000_000)
+    run(bot.on_utxos(WATCH, [first], []))
+    settle(bot, ctxf)
+    run(bot.on_utxos(WATCH, [_entry("b" * 64, 387_000_000)], [first]))   # spent + a new reward
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 2
+    # now a real reorg: taken away and paid again, the follower saw it
+    second = _entry("b" * 64, 387_000_000)
+    ctxf.last_reorg = ctxf.clock.t
+    run(bot.on_utxos(WATCH, [_entry("c" * 64, 387_000_000)], [second]))
+    settle(bot, ctxf)
+    assert sum("Block reward" in t for t in texts(ctxf)) == 2
