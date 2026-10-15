@@ -99,3 +99,38 @@ def test_insufficient_funds_and_coinbase_only():
     cb = [be.entry("aa" * 32, 0, 10 ** 10, coinbase=True)]
     with pytest.raises(InsufficientFunds):
         select_utxos(cb, 300)
+
+
+def test_a_wrpc_call_that_never_answers_times_out_and_resets(monkeypatch):
+    """BOT-010: no wRPC call may hang a bot (or every bot) forever."""
+    import asyncio, sys, types
+    import kachat.send as send
+
+    class HangingClient:
+        disconnected = 0
+
+        def __init__(self, url):
+            pass
+
+        async def connect(self):
+            return None
+
+        async def disconnect(self):
+            HangingClient.disconnected += 1
+
+        async def get_utxos_by_addresses(self, req):
+            await asyncio.sleep(3600)
+
+    monkeypatch.setitem(sys.modules, "kaspa", types.SimpleNamespace(RpcClient=HangingClient))
+    monkeypatch.setattr(send, "WRPC_TIMEOUT", 0.05)
+    backend = send.KaspaSdkBackend("ws://nowhere", "mainnet")
+
+    async def go():
+        try:
+            await backend.get_utxos("kaspa:qq")
+        except asyncio.TimeoutError:
+            return True
+        return False
+
+    assert asyncio.run(go()) is True
+    assert backend._rpc is None and HangingClient.disconnected == 1

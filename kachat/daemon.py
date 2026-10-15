@@ -57,6 +57,7 @@ class Daemon:
         self._price_cache: Dict[str, tuple] = {}
         self.self_sends: "collections.OrderedDict[str, bool]" = collections.OrderedDict()
         self._outbox_done: set = set()
+        self._ticks: Dict[str, "asyncio.Future"] = {}
         self.senders: Dict[str, MessageSender] = {}
         self.queues: Dict[str, asyncio.Queue] = {}
         self.workers: Dict[str, asyncio.Task] = {}
@@ -357,7 +358,6 @@ class Daemon:
         last_config = 0.0
         last_status = 0.0
         last_balance = 0.0
-        last_beat = 0.0
         while True:
             now = time.time()
             if now - last_config >= CONFIG_POLL:
@@ -366,14 +366,15 @@ class Daemon:
                     self.reload_config()
                 except Exception:
                     log.exception("reading bots.json failed")
+            # Each bot ticks in a task of its own (BOT-010): one whose send is slow or stuck is
+            # skipped until it finishes, and every other bot carries on.
             for bot in list(self.bots.values()):
                 if not bot.enabled:
                     continue
-                try:
-                    await bot.send_pending_greeting()
-                    await bot.tick(now)
-                except Exception:
-                    log.exception("[%s] tick failed", bot.id)
+                running = self._ticks.get(bot.id)
+                if running is not None and not running.done():
+                    continue
+                self._ticks[bot.id] = asyncio.ensure_future(self._tick_one(bot, now))
             self._ensure_utxo_subscription()
             await self.process_outbox()
             if now - last_balance >= BALANCE_EVERY:
@@ -384,14 +385,25 @@ class Daemon:
                 last_status = now
                 self.dirty |= set(self.bots)
             self.write_statuses()
-            if now - last_beat >= HEARTBEAT_EVERY:
-                last_beat = now
-                try:
-                    atomic_write_json(os.path.join(self.botd_dir, "daemon.json"),
-                                      {"pid": os.getpid(), "heartbeat": int(now), "network": self.network})
-                except OSError as exc:
-                    log.warning("heartbeat: %s", exc)
             await asyncio.sleep(1.0)
+
+    async def _tick_one(self, bot: Bot, now: float) -> None:
+        try:
+            await bot.send_pending_greeting()
+            await bot.tick(now)
+        except Exception:
+            log.exception("[%s] tick failed", bot.id)
+
+    async def heartbeat_loop(self):
+        """Says the daemon is alive (--send/--sweep hand work to it while it is), on its own so a
+        slow bot never makes it look dead (BOT-010)."""
+        while True:
+            try:
+                atomic_write_json(os.path.join(self.botd_dir, "daemon.json"),
+                                  {"pid": os.getpid(), "heartbeat": int(time.time()), "network": self.network})
+            except OSError as exc:
+                log.warning("heartbeat: %s", exc)
+            await asyncio.sleep(HEARTBEAT_EVERY)
 
     def write_statuses(self) -> None:
         for bid in list(self.dirty):
@@ -522,7 +534,8 @@ class Daemon:
         os.makedirs(self.botd_dir, exist_ok=True)
         os.makedirs(os.path.join(self.state_dir, "bots"), exist_ok=True)
         self.reload_config()
-        tasks = [asyncio.ensure_future(self.chain_loop()), asyncio.ensure_future(self.tick_loop())]
+        tasks = [asyncio.ensure_future(self.chain_loop()), asyncio.ensure_future(self.tick_loop()),
+                 asyncio.ensure_future(self.heartbeat_loop())]
         if self.indexer:
             tasks.append(asyncio.ensure_future(self.indexer_loop()))
         try:

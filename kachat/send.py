@@ -184,8 +184,12 @@ def build_payload(priv_hex: str, recipient: str, text: str, *, first_contact: bo
     return build_comm(a, sealed)
 
 
+WRPC_TIMEOUT = 30.0     # seconds for any one wRPC call (BOT-010: none may hang a bot forever)
+
+
 class KaspaSdkBackend:
-    """UTXO lookup, signing and submission through the Kaspa Python SDK (wRPC)."""
+    """UTXO lookup, signing and submission through the Kaspa Python SDK (wRPC). Every call is
+    bounded by WRPC_TIMEOUT; a timeout drops the connection so the next call opens a fresh one."""
 
     def __init__(self, url: str, network: str):
         self.url = url
@@ -197,7 +201,14 @@ class KaspaSdkBackend:
             if self._rpc is None:
                 from kaspa import RpcClient
                 rpc = RpcClient(url=self.url)
-                await rpc.connect()
+                try:
+                    await asyncio.wait_for(rpc.connect(), WRPC_TIMEOUT)
+                except BaseException:
+                    try:
+                        await asyncio.wait_for(rpc.disconnect(), 5)
+                    except BaseException:
+                        pass
+                    raise
                 self._rpc = rpc
             return self._rpc
 
@@ -205,13 +216,14 @@ class KaspaSdkBackend:
         rpc, self._rpc = self._rpc, None
         if rpc is not None:
             try:
-                await rpc.disconnect()
-            except Exception:
+                await asyncio.wait_for(rpc.disconnect(), 5)
+            except BaseException:
                 pass
 
     async def get_utxos(self, address: str) -> List[dict]:
         try:
-            resp = await (await self._client()).get_utxos_by_addresses({"addresses": [address]})
+            client = await self._client()
+            resp = await asyncio.wait_for(client.get_utxos_by_addresses({"addresses": [address]}), WRPC_TIMEOUT)
         except Exception:
             await self.reset()
             raise
@@ -231,7 +243,8 @@ class KaspaSdkBackend:
 
     async def submit(self, tx) -> str:
         try:
-            resp = await (await self._client()).submit_transaction({"transaction": tx, "allowOrphan": False})
+            client = await self._client()
+            resp = await asyncio.wait_for(client.submit_transaction({"transaction": tx, "allowOrphan": False}), WRPC_TIMEOUT)
         except Exception:
             await self.reset()
             raise
