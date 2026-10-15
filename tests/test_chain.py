@@ -336,3 +336,36 @@ def test_an_outbox_request_is_never_acted_on_twice(tmp_path):
         for t in d.workers.values():
             t.cancel()
     asyncio.run(go())
+
+
+def test_backfill_reads_every_first_contact_page(tmp_path):
+    """BOT-011: more than 100 first contacts since the cursor are all found."""
+    senders = [addr(f"{0x40 + i:02x}" * 32) for i in range(150)]
+
+    class FakeIndexer:
+        def __init__(self):
+            self.inbox_calls = []
+            self.asked = set()
+
+        def by_inbox(self, tag, block_time, limit):
+            self.inbox_calls.append(block_time)
+            rows = [{"txid": f"{i:064x}", "sender": s, "block_time": 1000 + i, "b64": ""}
+                    for i, s in enumerate(senders) if 1000 + i > block_time]
+            return rows[:limit]
+
+        def by_sender(self, sender, alias, block_time, limit):
+            self.asked.add(sender)
+            return []
+
+    async def go():
+        d, node, be = make_daemon(tmp_path)
+        d.reload_config()
+        bot = d.bots["mining-1"]
+        bot.data["indexerCursorMs"] = 1
+        d.indexer = FakeIndexer()
+        await d.backfill(bot)
+        assert len(d.indexer.inbox_calls) == 2                       # 100, then the last 50
+        assert set(senders) <= d.indexer.asked
+        for t in d.workers.values():
+            t.cancel()
+    asyncio.run(go())

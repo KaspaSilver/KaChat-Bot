@@ -34,6 +34,8 @@ BALANCE_EVERY = 60.0
 CONFIG_POLL = 5.0
 INDEXER_EVERY = 300.0
 INDEXER_OVERLAP_MS = 15 * 60 * 1000
+INBOX_PAGE = 100
+INBOX_PAGES = 50         # at most 5,000 first contacts per backfill run; the rest the next run
 SPENT_KEEP = 120.0
 HEARTBEAT_EVERY = 5.0
 
@@ -433,10 +435,21 @@ class Daemon:
         started_ms = int(time.time() * 1000)
         cursor = int(bot.data.get("indexerCursorMs") or int(bot.data.get("createdAt", time.time())) * 1000)
         senders = set()
-        rows = await asyncio.to_thread(self.indexer.by_inbox, bot.inbox_tag, cursor, 100)
-        for r in rows:
-            if r["sender"]:
-                senders.add(r["sender"])
+        # Every first contact since the cursor, page by page (BOT-011: one page of 100 used to be
+        # all, and the cursor then moved past the rest). Capped; when the cap is hit the cursor
+        # only moves to the last row read, and the next run carries on from there.
+        inbox_since = cursor
+        capped = False
+        for page_no in range(INBOX_PAGES):
+            rows = await asyncio.to_thread(self.indexer.by_inbox, bot.inbox_tag, inbox_since, INBOX_PAGE)
+            for r in rows:
+                if r["sender"]:
+                    senders.add(r["sender"])
+            if len(rows) < INBOX_PAGE or rows[-1]["block_time"] <= inbox_since:
+                break
+            inbox_since = rows[-1]["block_time"]
+            if page_no == INBOX_PAGES - 1:
+                capped = True
         senders |= bot.known_senders()
         for s in sorted(senders):
             try:
@@ -460,7 +473,10 @@ class Daemon:
                 if len(page) < 50 or page[-1]["block_time"] <= since:
                     break
                 since = page[-1]["block_time"]
-        bot.data["indexerCursorMs"] = max(cursor, started_ms - INDEXER_OVERLAP_MS)
+        if capped:
+            bot.data["indexerCursorMs"] = max(cursor, inbox_since)
+        else:
+            bot.data["indexerCursorMs"] = max(cursor, started_ms - INDEXER_OVERLAP_MS)
         bot.save()
 
     async def process_outbox(self) -> None:
