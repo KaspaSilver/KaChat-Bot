@@ -306,7 +306,7 @@ def test_full_bot_makes_room_by_forgetting_someone_quiet_for_a_month(ctxf, monke
     import kachat.bots.public as public
     monkeypatch.setattr(public, "MAX_PEOPLE", 2)
     bot = host(ctxf)
-    start(bot, USER)
+    start(bot, USER)                                           # agreed, never finished setup
     ctxf.clock.t += 40 * 86400
     start(bot, OTHER)
     newcomer = addr("66" * 32)
@@ -384,3 +384,21 @@ def test_daemon_records_every_self_send_it_sees():
     d.note_self_send(ChainTx(txid="t2", payload_hex="", block_time_ms=0, block_hash="",
                              inputs=[("p", 1, W2, 5)], outputs=[(OTHER, 2), (W2, 2)]))
     assert d.self_sends == {"t1": True, "t2": False}
+
+
+
+def test_a_set_up_subscriber_is_never_dropped_to_make_room(ctxf, monkeypatch):
+    """BOT-012: subscribers only receive notifications; being 'quiet' must not cost them their setup."""
+    import kachat.bots.public as public
+    monkeypatch.setattr(public, "MAX_PEOPLE", 2)
+    bot = host(ctxf)
+    start(bot, USER)
+    say(bot, WATCH, USER)
+    say(bot, "0", USER)                                        # USER is set up
+    assert bot.people[USER].stage == "active"
+    ctxf.clock.t += 40 * 86400
+    start(bot, OTHER)
+    newcomer = addr("66" * 32)
+    start(bot, newcomer)
+    assert USER in bot.people and bot.people[USER].address_list() == [WATCH]
+    assert texts(ctxf, newcomer)[-1].startswith("Sorry, I'm full right now")

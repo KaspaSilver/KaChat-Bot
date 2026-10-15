@@ -15,7 +15,8 @@ message is paid from the bot's wallet, and its balance is the only cap.
 People (BOT-004): at most MAX_PEOPLE who have agreed. Someone who messaged but never agreed is
 forgotten after a day (and at most MAX_PENDING wait to agree at once). When a newcomer agrees
 with the bot full, the person quiet longest (nothing from them for IDLE_EVICT) makes room; if
-nobody is that quiet, the newcomer is told it is full, at most once a day.
+nobody is that quiet, the newcomer is told it is full, at most once a day. Someone who is set up
+is never forgotten to make room (BOT-012): only people who agreed but never finished setup.
 (`per_person_per_day` can still set a daily cap per person; the daemon passes none.)
 
 The pool hashrate (the panel's own stratum bridge) is the owner's, not a stranger's, so public
@@ -219,8 +220,11 @@ class PublicHost(Bot):
         """Room for one more agreed person: under the cap, or the quietest idle one forgotten."""
         if self._agreed_count() < MAX_PEOPLE:
             return True
+        # Never someone who is set up (BOT-012): subscribers only receive notifications, so they
+        # always look quiet. Only people who agreed but never finished setup can make room.
         idle = [(self._last_heard(p), who) for who, p in self.people.items()
-                if p.data.get("agreedNotPrivate") and now - self._last_heard(p) >= IDLE_EVICT]
+                if p.data.get("agreedNotPrivate") and p.stage != "active" and not p.data.get("settings")
+                and now - self._last_heard(p) >= IDLE_EVICT]
         if not idle:
             return False
         _, who = min(idle)
