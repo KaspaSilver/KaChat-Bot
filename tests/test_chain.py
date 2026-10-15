@@ -313,3 +313,26 @@ def test_panel_alert_to_someone_who_never_wrote_is_a_first_contact(tmp_path):
         for t in d.workers.values():
             t.cancel()
     asyncio.run(go())
+
+
+def test_an_outbox_request_is_never_acted_on_twice(tmp_path):
+    """BOT-009: a request whose file cannot be removed (left by another user) is not sent again."""
+    async def go():
+        d, node, be = make_daemon(tmp_path)
+        d.reload_config()
+        outbox = tmp_path / "state" / "botd" / "outbox"
+        outbox.mkdir(parents=True, exist_ok=True)
+        req = outbox / "x1.req.json"
+        req.write_text(json.dumps({"bot": "mining-1", "text": "Alert", "to": USER, "createdAt": time.time()}))
+        real_remove = os.remove
+        os.remove = lambda p: (_ for _ in ()).throw(PermissionError("root-owned"))   # cannot remove it
+        try:
+            await d.process_outbox()
+            await d.process_outbox()
+            await d.process_outbox()
+        finally:
+            os.remove = real_remove
+        assert len(be.submitted) == 1                          # sent once, not three times
+        for t in d.workers.values():
+            t.cancel()
+    asyncio.run(go())

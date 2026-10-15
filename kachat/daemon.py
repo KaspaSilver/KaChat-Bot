@@ -56,6 +56,7 @@ class Daemon:
         self.bots: Dict[str, Bot] = {}
         self._price_cache: Dict[str, tuple] = {}
         self.self_sends: "collections.OrderedDict[str, bool]" = collections.OrderedDict()
+        self._outbox_done: set = set()
         self.senders: Dict[str, MessageSender] = {}
         self.queues: Dict[str, asyncio.Queue] = {}
         self.workers: Dict[str, asyncio.Task] = {}
@@ -457,12 +458,22 @@ class Daemon:
             return
         for name in names:
             path = os.path.join(self.outbox_dir, name)
-            req = read_json(path)
             result_path = path[: -len(".req.json")] + ".result.json"
+            # Answered already (its file could not be removed, e.g. left by a one-off run as
+            # another user): never act on it twice (BOT-009), just try to tidy it away again.
+            if name in self._outbox_done or os.path.exists(result_path):
+                self._outbox_done.add(name)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                continue
+            req = read_json(path)
+            self._outbox_done.add(name)
             try:
                 os.remove(path)
-            except OSError:
-                pass
+            except OSError as exc:
+                log.warning("outbox: cannot remove %s (%s); it will not be acted on again", name, exc)
             if not isinstance(req, dict):
                 continue
             bot = self.bots.get(str(req.get("bot")))
@@ -474,7 +485,7 @@ class Daemon:
                 else:
                     res = await sweep_bot(bot, self.senders[bot.id], str(req.get("to") or ""), self.network)
                     self.dirty.add(bot.id)
-                atomic_write_json(result_path, res)
+                self._write_result(result_path, res)
                 continue
             res = {"ok": False, "txid": None, "error": None}
             if time.time() - float(req.get("createdAt") or 0) > 120:
@@ -497,7 +508,15 @@ class Daemon:
                 first = bool(to) and to not in bot.known_senders()
                 txid = (await bot.send_to(to, text, first_contact=first) if to else None) if req.get("to") else await bot.say(text)
                 res.update(ok=bool(txid), txid=txid, error=None if txid else (res["error"] or bot.error or "not sent"))
-            atomic_write_json(result_path, res)
+            self._write_result(result_path, res)
+
+    @staticmethod
+    def _write_result(path: str, res: dict) -> None:
+        """The answer for --send/--sweep; a folder it cannot write to is logged, never fatal."""
+        try:
+            atomic_write_json(path, res)
+        except OSError as exc:
+            log.warning("outbox: cannot write %s: %s", os.path.basename(path), exc)
 
     async def run(self):
         os.makedirs(self.botd_dir, exist_ok=True)
