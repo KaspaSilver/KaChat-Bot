@@ -84,6 +84,9 @@ class FakeCtxFactory:
         self.balance = 5_000_000_000
         self.price = None
         self.self_sends = {}
+        # What the fake chain follower says about a tx it has not been told about: False (seen,
+        # not a self-send). None = not seen yet, which makes wallet bots wait for it.
+        self.self_send_default = False
         self.first_contacts = []
         self.market = None
         self.hashrate = None
@@ -114,7 +117,7 @@ class FakeCtxFactory:
 
         return BotContext(network=NET, send=send, get_balance=get_balance, clock=self.clock,
                           fetch_price=fetch_price, fetch_hashrate=fetch_hashrate, fetch_market=fetch_market,
-                          spender_of=lambda k: self.spenders.get(k), self_send_of=lambda t: self.self_sends.get(t),
+                          spender_of=lambda k: self.spenders.get(k), self_send_of=lambda t: self.self_sends.get(t, self.self_send_default),
                           max_out_per_hour=max_out)
 
 

@@ -266,13 +266,14 @@ def test_another_bots_messages_are_never_reported(ctxf):
     assert len(texts(ctxf, OTHER)) == before                   # silence: no loop can start
 
 
-def test_a_self_send_the_chain_has_not_shown_yet_is_still_skipped(ctxf):
+def test_a_self_send_the_chain_never_shows_is_still_skipped(ctxf):
+    ctxf.self_send_default = None                              # the follower never sees it
     W2 = addr("99" * 32)
     bot = _wallet_watching(ctxf, W2)
     before = len(texts(ctxf, OTHER))
     run(bot.on_utxos(W2, [_out("b" * 64, 49_802_000, W2)], [_out("a" * 64, 50_000_000, W2)]))
     ctxf.spenders[f"{'a' * 64}:0"] = "b" * 64
-    ctxf.clock.t += 10
+    ctxf.clock.t += 16                                         # past the wait: the 0.01 KAS rule decides
     run(bot.tick(ctxf.clock.t))
     assert len(texts(ctxf, OTHER)) == before
 
@@ -346,3 +347,40 @@ def test_a_persons_file_does_not_grow_with_every_message(ctxf):
     for _ in range(50):
         say(bot, "help", OTHER)
     assert "outTimes" not in bot.people[OTHER].data
+
+
+def test_back_to_back_bot_messages_reported_as_one_change_stay_silent(ctxf):
+    """BOT-001 (run 8): W2 sends two chained messages accepted together; the node reports
+    removed {u0}, added {u2}. Only the chain follower can tell tx2 is a self-send; the wallet
+    bot waits for that verdict instead of reporting 'received'."""
+    ctxf.self_send_default = None                              # the follower has not seen tx2 yet
+    W2 = addr("99" * 32)
+    bot = _wallet_watching(ctxf, W2)
+    before = len(texts(ctxf, OTHER))
+    u0 = _out("a" * 64, 50_000_000, W2)
+    u2 = _out("c" * 64, 49_600_000, W2)
+    ctxf.spenders[f"{'a' * 64}:0"] = "b" * 64                  # tx1 spent u0 (tx2 spent tx1's output)
+    ctxf.self_sends["b" * 64] = True
+    run(bot.on_utxos(W2, [u2], [u0]))
+    for _ in range(3):                                         # still unknown: it waits
+        ctxf.clock.t += 4
+        run(bot.tick(ctxf.clock.t))
+    assert len(texts(ctxf, OTHER)) == before
+    ctxf.self_sends["c" * 64] = True                           # the follower saw tx2: a self-send
+    ctxf.clock.t += 2
+    run(bot.tick(ctxf.clock.t))
+    assert len(texts(ctxf, OTHER)) == before                   # silence, no loop
+
+
+def test_daemon_records_every_self_send_it_sees():
+    from kachat.chain import ChainTx
+    from kachat.daemon import Daemon
+    d = Daemon.__new__(Daemon)
+    import collections
+    d.self_sends = collections.OrderedDict()
+    W2 = addr("99" * 32)
+    d.note_self_send(ChainTx(txid="t1", payload_hex="", block_time_ms=0, block_hash="",
+                             inputs=[("p", 0, W2, 5)], outputs=[(W2, 4)]))
+    d.note_self_send(ChainTx(txid="t2", payload_hex="", block_time_ms=0, block_hash="",
+                             inputs=[("p", 1, W2, 5)], outputs=[(OTHER, 2), (W2, 2)]))
+    assert d.self_sends == {"t1": True, "t2": False}

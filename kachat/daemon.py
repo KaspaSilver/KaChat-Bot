@@ -232,7 +232,19 @@ class Daemon:
                     return True
         return False
 
+    def note_self_send(self, ct: ChainTx) -> None:
+        """A tx whose every input and output is one address moved nothing anywhere: a bot's
+        message or a wallet compound, which wallet bots never report (BOT-001). Recorded for every
+        tx the follower hands over (each chat message, each spend of a watched coin), not only one
+        spending a coin already known: a bot's back-to-back messages chain on each other's unseen
+        outputs, and the node reports them as one change."""
+        addrs = {a for (_, _, a, _) in ct.inputs} | {a for (a, _) in ct.outputs}
+        self.self_sends[ct.txid] = len(addrs) == 1 and None not in addrs
+        while len(self.self_sends) > 20000:
+            self.self_sends.popitem(last=False)
+
     async def on_chain_tx(self, ct: ChainTx) -> None:
+        self.note_self_send(ct)
         if self.wallet_outpoints:
             for (ptx, pidx, _, _) in ct.inputs:
                 key = f"{ptx}:{pidx}"
@@ -240,12 +252,6 @@ class Daemon:
                     self.spenders[key] = ct.txid
                     while len(self.spenders) > 5000:
                         self.spenders.popitem(last=False)
-                    # A tx whose every input and output is one address moved nothing anywhere: a
-                    # bot's message or a wallet compound (BOT-001: wallet bots must not report it).
-                    addrs = {a for (_, _, a, _) in ct.inputs} | {a for (a, _) in ct.outputs}
-                    self.self_sends[ct.txid] = len(addrs) == 1 and None not in addrs
-                    while len(self.self_sends) > 5000:
-                        self.self_sends.popitem(last=False)
         if is_chat_payload_hex(ct.payload_hex):
             sender = ct.sender
             if sender:

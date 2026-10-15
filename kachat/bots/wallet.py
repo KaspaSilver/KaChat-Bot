@@ -21,6 +21,7 @@ from ..address import short_address
 from .base import MAX_WATCHED, AnswerError, Bot, Question, fmt_kas, parse_address_list, parse_number
 
 SETTLE = 4.0
+SELF_SEND_WAIT = 15.0                 # how long a change waits for the chain follower's verdict
 SELF_SEND_MAX_SOMPI = 1_000_000      # 0.01 KAS: the fee of a self-send, never a real payment
 MAX_NICKNAME = 32
 NO_NICKNAME = ("none", "no", "nothing", "n/a")
@@ -115,11 +116,19 @@ class WalletBot(Bot):
         if address in self.watched_addresses():
             self._buffer.append((self.ctx.clock(), address, list(added), list(removed)))
 
+    def _verdict_pending(self, entry: tuple, now: float) -> bool:
+        """Still waiting to learn whether one of this change's transactions was a self-send."""
+        t, _, added, removed = entry
+        if now - t >= SELF_SEND_WAIT:
+            return False
+        txids = {e.get("txid") for e in added} | {self.ctx.spender_of(f"{e['txid']}:{e['index']}") for e in removed}
+        return any(x and self.ctx.self_send_of(x) is None for x in txids)
+
     async def tick(self, now: float) -> None:
-        ready = [b for b in self._buffer if now - b[0] >= SETTLE]
+        ready = [b for b in self._buffer if now - b[0] >= SETTLE and not self._verdict_pending(b, now)]
         if not ready:
             return
-        self._buffer = [b for b in self._buffer if now - b[0] < SETTLE]
+        self._buffer = [b for b in self._buffer if b not in ready]
         by_addr: Dict[str, tuple] = {}
         for _, addr, added, removed in ready:
             a, r = by_addr.setdefault(addr, ([], []))
