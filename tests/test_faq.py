@@ -210,7 +210,7 @@ def test_learn_kaspa_topics(question, title):
 def test_learn_kaspa_answers_cite_their_article():
     assert BY_TITLE["Finality"].answer.endswith("Source: https://kaspa.com/learn-kaspa/post/finality-depth")
     cited = [t for t in TOPICS if "\nSource: https://kaspa.com/learn-kaspa" in t.answer]
-    assert len(cited) == 26
+    assert len(cited) == 25
 
 
 def test_how_to_answers_link_kaspa_silver_videos():
@@ -467,3 +467,37 @@ def test_wallet_security_questions(question, title):
 ])
 def test_mining_pool_questions(question, title):
     assert best_topic(TOPICS, question).title == title
+
+
+@pytest.mark.parametrize("question,title", [
+    ("how does difficulty adjustment work", "Difficulty adjustment"),
+    ("what is the network hashrate", "Difficulty adjustment"),
+    ("when can I spend my coinbase rewards", "Mining rewards"),
+    ("my transaction is stuck pending", "The mempool"),
+    ("can I replace by fee", "The mempool"),
+    ("why is there a change output", "How a transaction works"),
+    ("what is a kaspa:p address", "P2SH"),
+    ("what is pay to script hash", "P2SH"),
+    ("what is Argent", "Argent"),
+    ("what are vprogs", "vProgs"),
+    ("is there a python sdk", "SDKs"),
+    ("where are the developer docs", "Developer resources"),
+    ("what are kaspa's network parameters", "Network parameters"),
+    ("what research papers is kaspa based on", "Research history"),
+    ("what is the minimum relay fee", "Fees"),
+    ("how many transactions per second can kaspa do", "Transactions per second"),
+    ("what is KIP-16", "Zero-knowledge proofs"),
+    ("is there a tail emission", "Emission and halving"),
+    ("what is tn12", "Testnet"),
+])
+def test_kaspalytics_topics(question, title):
+    assert best_topic(TOPICS, question).title == title
+
+
+def test_kaspalytics_answers_cite_their_page():
+    cited = [t.title for t in TOPICS if "\nSource: https://www.kaspalytics.com/learn/" in t.answer]
+    assert len(cited) == 19
+    assert BY_TITLE["KIP-21"].answer.count("went live with the Toccata hard fork") == 1
+    assert "474,165,565" in BY_TITLE["Toccata hard fork"].answer
+    assert "few questions per person" not in BY_TITLE["About this bot"].answer
+

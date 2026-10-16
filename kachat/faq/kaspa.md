@@ -72,10 +72,11 @@ The maximum supply is about 28.7 billion KAS (28,704,026,601). No more can ever 
 Video: https://youtu.be/4rCzKLa1ABs (Why Does Kaspa Have A 28 Billion Supply?)
 
 ## Emission and halving
-keys: emission, halving, halvening, chromatic, block reward schedule, reward schedule, inflation, reward halve, reduction
-Kaspa uses a "chromatic" emission: the block reward halves every year, but smoothly, with a small cut every month (each month's reward is the previous one times (1/2)^(1/12)). There is no single halving day. The last KAS are expected to be mined around 2057.
+keys: tail emission, no tail emission, after 2057, 440, emission, halving, halvening, chromatic, block reward schedule, reward schedule, inflation, reward halve, reduction
+Kaspa uses a "chromatic" emission. After a flat 500 KAS per block in its first months, rewards started falling in May 2022 from 440 KAS per second, cut about 5.6% every month (each month is the previous one times (1/2)^(1/12)). So the reward halves once a year, smoothly, with no single halving day. Since Crescendo the schedule is per second, so going to 10 blocks per second changed nothing. The last KAS are expected around 2057; after that miners earn only fees (there is no tail emission).
 Video: https://youtu.be/0AcB0ZIECUI (The Rapid Emission Schedule of Kaspa)
 Video: https://youtu.be/prBcEZkj4Ic (What Happens When All The Kaspa Is Mined?)
+Source: https://www.kaspalytics.com/learn/mining/emission
 
 ## Current reward and circulating supply
 keys: current reward, current block reward, block reward now, block reward today, block reward right now, what is the block reward, how much is the block reward, circulating supply, current supply, how many mined, mined so far, reward right now, reward per block
@@ -83,7 +84,7 @@ The block reward changes every month and the circulating supply grows every seco
 
 ## Blocks per second
 keys: blocks per second, bps, block time, how fast are blocks, block speed, 10 bps, 1 bps, block interval
-Kaspa makes 10 blocks per second (one every 100 milliseconds). It moved from 1 to 10 blocks per second with the Crescendo hard fork on May 5, 2025.
+Kaspa makes 10 blocks per second (one every 100 milliseconds), about 6,000 times Bitcoin's block rate. It moved from 1 to 10 blocks per second with the Crescendo hard fork on May 5, 2025.
 Video: https://youtu.be/SxiIgD649Gg (Kaspa 10 Blocks Per Second Activated On Mainnet)
 
 ## Blocks per day
@@ -91,9 +92,15 @@ keys: blocks per day, blocks a day, how many blocks, 864000, daily blocks
 At 10 blocks per second Kaspa makes 864,000 blocks a day.
 Source: https://kaspa.com/learn-kaspa/post/blue-score-and-blue-work
 
+## Network parameters
+keys: network parameters, parameters, key numbers, specs, specifications, technical specs, merge depth, max parents, parents per block, how many parents, mergeset limit
+Kaspa's key numbers: 10 blocks per second; GHOSTDAG k = 124; up to 16 parents and 248 merged blocks per block; merge depth 36,000 blocks (about 1 hour), finality 432,000 (about 12 hours), pruning 1,080,000 (about 30 hours); coinbase maturity 1,000 blocks; per-block budgets of 500,000 compute, 500,000 storage and 1,000,000 transient grams; minimum relay fee 100 sompi per gram; max supply about 28.7 billion KAS.
+Source: https://www.kaspalytics.com/learn/network-parameters
+
 ## Confirmation time
 keys: confirmation, confirmations, how long, how fast, transaction speed, confirm time, settle
-A transaction shows up in a block within about a second and is safely confirmed within seconds. For large amounts, waiting around 10 seconds is plenty. There are no long waits like Bitcoin's 10-minute blocks. (Send finality for the point after which it can never be undone.)
+A transaction lands in a block within about a second and is placed in the agreed order about a second later; from then on its confirmations grow by about 10 every second. Wallets treat a payment as settled within seconds, and for large amounts waiting around 10 seconds is plenty. There are no long waits like Bitcoin's 10-minute blocks. (Send finality for the point after which it can never be undone.)
+Source: https://www.kaspalytics.com/learn/blockdag/confirmations
 
 ## Finality
 keys: finality, final, finality depth, irreversible, reversible, undone, reverse a transaction, reversed, be reversed, reverse, 12 hours, reorg, reorganization, how deep, 432000
@@ -102,7 +109,8 @@ Source: https://kaspa.com/learn-kaspa/post/finality-depth
 
 ## Transactions per second
 keys: tps, transactions per second, throughput, scalability, scale, capacity
-At 10 blocks per second the network can handle thousands of transactions per second, and the roadmap aims higher. Fees stay low because blocks are rarely full.
+Kaspa's base layer tops out at roughly 2,500 simple payments per second: 10 blocks per second, each with room for 500,000 grams of compute mass, and a simple payment weighs a bit over 2,000 grams. Multisig and covenant transactions are heavier, so fewer of those fit. Real use has stayed well below that ceiling, which is why fees stay low, and the roadmap aims higher.
+Source: https://www.kaspalytics.com/learn/transactions/throughput
 
 ## BlockDAG
 keys: blockdag, block dag, dag, why dag, directed acyclic graph, orphan, orphans, parallel blocks
@@ -141,9 +149,14 @@ The virtual block is not a real block: it is how every node sums up the current 
 Source: https://kaspa.com/learn-kaspa/post/virtual-block
 
 ## DAGKnight
-keys: dagknight, dag knight, dk, parameterless
-DAGKnight is the planned successor to GHOSTDAG, from the same research. GHOSTDAG uses a fixed worst-case network delay (its k parameter); DAGKnight has no such parameter: it measures how connected the honest blocks actually are, so confirmations speed up when the network is fast and it stays safe when it is slow, as long as honest miners hold over half the hashrate. It is not the live consensus yet.
+keys: dagknight, dag knight, dk, parameterless, kip 2, kip2
+DAGKnight is the planned successor to GHOSTDAG, from the same research. GHOSTDAG uses a fixed worst-case network delay (its k parameter); DAGKnight has no such parameter: it measures how connected the honest blocks actually are, so confirmations speed up when the network is fast and it stays safe when it is slow, as long as honest miners hold over half the hashrate. It is proposed as KIP-2 and is not the live consensus yet.
 Source: https://kaspa.com/learn-kaspa/post/dagknight
+
+## Research history
+keys: research history, research papers, research paper, papers, whitepaper, white paper, spectre, ghost protocol, ghost paper, phantom paper, ethereum whitepaper, academic, eprint
+Kaspa comes from years of academic research led by Yonatan Sompolinsky: GHOST (cited in the Ethereum whitepaper), then SPECTRE, PHANTOM and finally GHOSTDAG, which Kaspa runs today. DAGKnight is the next step. The papers are public on the IACR ePrint archive (eprint.iacr.org): PHANTOM/GHOSTDAG is 2018/104 and DAGKnight is 2022/1494.
+Source: https://www.kaspalytics.com/learn/what-is-kaspa
 
 ## Hard forks
 keys: hard fork, hardfork, hard forks, hardforks, fork, forks, upgrade, upgrades, network upgrade
@@ -156,20 +169,26 @@ A hard fork is a change to the network's rules that older node software won't ac
 Video: https://youtu.be/mnT0Qahq2iE (Future Hard Forks On Kaspa Explained)
 
 ## Crescendo hard fork
-keys: crescendo, crescendo hard fork, crescendo upgrade, kip 14, kip14, may 2025, 10 bps hard fork
-Crescendo was the hard fork of May 5, 2025. It raised Kaspa from 1 to 10 blocks per second and added new script features (KIP-10 introspection) that lay the groundwork for smart contracts and covenants.
+keys: crescendo, crescendo hard fork, crescendo upgrade, kip 14, kip14, kip 4, kip4, kip 13, kip13, 110165000, may 2025, 10 bps hard fork
+Crescendo was the hard fork of May 5, 2025 (DAA score 110,165,000). It raised Kaspa from 1 to 10 blocks per second (KIP-14): GHOSTDAG's k went from 18 to 124, blocks may have up to 16 parents, finality went from 24 to 12 hours and coinbase maturity from 100 to 1,000 blocks. It also brought sampled difficulty adjustment (KIP-4), storage and transient mass (KIP-9, KIP-13) and script introspection (KIP-10), the groundwork for covenants. Emission did not change.
 Video: https://youtu.be/GnfYuK7rn24 (Kaspa Crescendo Update: Everything You Need To Know)
+Source: https://www.kaspalytics.com/learn/upgrades/crescendo
 
 ## Toccata hard fork
-keys: toccata, covenant hard fork, covenants hard fork, next hard fork, kip 17, kip17
-Toccata is the hard fork that brought covenants to Kaspa's base layer in mid-2026 (around DAA score 474 million): richer transaction introspection (KIP-17), consensus-tracked covenant IDs (KIP-20), a new transaction version with a compute budget (KIP-24), and on-chain checks of zero-knowledge proofs (Groth16 and RISC Zero). Builders now write covenants in SilverScript.
+keys: toccata, covenant hard fork, covenants hard fork, next hard fork, kip 17, kip17, june 2026, 474165565
+Toccata is the hard fork that made Kaspa programmable on its base layer. It activated on June 30, 2026 at DAA score 474,165,565 with four KIPs: KIP-17 (covenants and richer introspection), KIP-20 (covenant IDs), KIP-16 (on-chain checks of zero-knowledge proofs) and KIP-21 (sequencing lanes for ZK apps). It also added transaction version 1 with a compute budget, doubled the room for transaction data per block, and raised the minimum relay fee from 1 to 100 sompi per gram. Builders write covenants in SilverScript.
 Video: https://youtu.be/Vew-_zOQcQ4 (A New Hard Fork For Kaspa Incoming!)
-Source: https://kaspa.com/learn-kaspa/post/dag-and-kaspa
+Source: https://www.kaspalytics.com/learn/upgrades/toccata
 
 ## Mining algorithm
 keys: algorithm, kheavyhash, heavyhash, heavy hash, hash function, pow algorithm, proof of work algorithm
 Kaspa's proof-of-work algorithm is kHeavyHash: a matrix multiplication between two rounds of Keccak (cSHAKE256) hashing.
 Video: https://youtu.be/DryTmfH1BAg (Understanding Kaspa Mining For Beginners)
+
+## Difficulty adjustment
+keys: difficulty, difficulty adjustment, mining difficulty, how is difficulty set, difficulty retarget, retarget, kip 4, kip4, network hashrate, hashrate, hash rate, total hashrate
+Kaspa retunes its mining difficulty with every block, about every 100 milliseconds (Bitcoin does it every two weeks), so blocks keep coming 10 per second whatever the hashrate. Since Crescendo it uses a sampled window (KIP-4): about one block per 4 seconds over the last 2,641 seconds. The network's hashrate is roughly difficulty x 2 x 10 blocks per second; an explorer shows the live figure.
+Source: https://www.kaspalytics.com/learn/mining/difficulty
 
 ## Mining hardware
 keys: asic, asics, miner, miners, iceriver, antminer, bitmain, goldshell, ks0, ks3, ks5, mining hardware, what to mine with
@@ -197,6 +216,11 @@ Solo mining sends every block you find straight to your own address through your
 Video: https://youtu.be/1IR7vAE6NCQ (How To Solo Mine Kaspa With Your Own Node)
 Video: https://youtu.be/PglrShDyR5U (Solo Mining Kaspa For One Month With Only 600GH)
 
+## Mining rewards
+keys: mining reward, mining rewards, coinbase, coinbase maturity, maturity, mature, immature, when do i get paid, when are rewards paid, reward paid, rewards paid, red block reward, who gets the reward
+Each Kaspa block's coinbase pays the miners of the blocks it merges, not its own miner. Blue blocks get their reward plus fees at their own payout address; red blocks aren't paid to their own miner. Coinbase coins can be spent after 1,000 blocks, about 100 seconds. Because no honest block is orphaned, even a small solo miner is paid for every block it finds.
+Source: https://www.kaspalytics.com/learn/mining
+
 ## Staking
 keys: staking, stake, proof of stake, pos, validator, validators, delegate, earn interest, yield
 Kaspa has no staking. It is pure proof-of-work: new KAS go only to miners. Anyone offering "Kaspa staking" is running their own scheme, not the network.
@@ -209,10 +233,16 @@ The smallest unit of KAS is the sompi. 1 KAS = 100,000,000 sompi, so KAS has 8 d
 keys: address, addresses, address format, kaspa:q, kaspa:p, kaspatest
 Mainnet addresses start with "kaspa:" and testnet addresses with "kaspatest:". A normal wallet address starts with kaspa:q; one starting with kaspa:p is a script (P2SH) address. The address includes a checksum, so a typo is caught instead of sending to a wrong address.
 
+## P2SH
+keys: p2sh, pay to script hash, paytoscripthash, script hash, redeem script, kaspa:p address, script address
+Pay-to-script-hash (P2SH) locks coins to the hash of a script instead of a key; those addresses start with kaspa:p. To spend, you reveal the script (the redeem script) plus whatever it needs, such as signatures, and every node checks the hash and runs it. Multisig wallets and all covenants, including SilverScript contracts, use P2SH, so their rules stay hidden until the coins are spent.
+Source: https://www.kaspalytics.com/learn/transactions/p2sh
+
 ## Fees
-keys: fee, fees, transaction fee, how much does it cost, cost to send, gas, mass, priority fee
-Kaspa fees are tiny, usually a small fraction of a cent. A fee is based on the transaction's "mass" (its size and the outputs it creates). When the network is busy you can add a priority fee to go first.
+keys: fee rate, sompi per gram, minimum fee, relay fee, fee, fees, transaction fee, how much does it cost, cost to send, gas, mass, priority fee
+Kaspa fees are tiny. There is no fee field: the fee is whatever the inputs hold beyond the outputs. The minimum follows the transaction's "mass" (its compute, size and storage cost) at 100 sompi per gram since Toccata, and a normal payment weighs a few thousand grams, so it costs a few thousandths of a KAS. When the network is busy, a higher fee rate goes first, since miners favour higher fee rates.
 Video: https://youtu.be/VJf4iS9_0cs (The Base Fee Increase Is Not As Dramatic As It Seems)
+Source: https://www.kaspalytics.com/learn/transactions/fees
 
 ## Storage mass (KIP-9)
 keys: storage mass, kip 9, kip9, kip-9, mass, why is the fee so high, small outputs, tiny amounts, send small amount, dust attack, utxo bloat
@@ -220,14 +250,24 @@ Storage mass (KIP-9) makes transactions that create many small coins expensive, 
 Source: https://kaspa.com/learn-kaspa/post/storage-mass-kip-0009
 
 ## Block mass limit
-keys: block size, block limit, mass limit, block mass, how big is a block, 500000
-Kaspa limits blocks by "mass" instead of bytes: a combined measure of computing, bandwidth and storage cost. Each block can hold up to 500,000 mass, and at 10 blocks per second that leaves plenty of room.
+keys: block size, block limit, mass limit, block mass, how big is a block, 500000, 1000000, transient mass, compute mass, gram, grams
+Kaspa limits blocks by "mass" instead of bytes, with three separate budgets per block: 500,000 grams of compute mass, 500,000 of storage mass, and 1,000,000 of transient mass (size x 4, about 250 KB of block body since Toccata). A transaction's fee follows the heaviest of its three masses. At 10 blocks per second that leaves plenty of room.
 Source: https://kaspa.com/learn-kaspa/post/anatomy-of-a-block
 
 ## UTXOs and compounding
 keys: utxo, utxos, compound, compounding, too many inputs, transaction too large, consolidate
 Kaspa uses UTXOs like Bitcoin: your balance is a set of separate coins. Many small payments (mining payouts, for example) make a wallet hold lots of coins, so sending can need several transactions. Most wallets "compound" these automatically or with one button, and compounding is cheap (see storage mass).
 Video: https://youtu.be/0bElcfLU7E8 (Kaspa UTXOs Explained)
+
+## How a transaction works
+keys: how do transactions work, how does a transaction work, how transactions work, transaction structure, inside a transaction, change output, change address, why change, lock time, locktime, payload, transaction payload, where is my balance stored, balance stored
+Kaspa stores no balances. A transaction spends whole coins (UTXOs) and creates new ones: pay 0.2 KAS from a 10 KAS coin and it makes a 0.2 KAS output for the payee and a change output back to you, and whatever is left over is the miner's fee. Each input points to a coin and carries a signature (usually Schnorr). A transaction can also carry a data payload (that is how KaChat messages travel) and a lock time.
+Source: https://www.kaspalytics.com/learn/transactions
+
+## The mempool
+keys: mempool, mem pool, pending, pending transaction, stuck, stuck transaction, unconfirmed, replace by fee, rbf, speed up transaction, not confirming, cancel transaction
+Each node keeps its own mempool of transactions waiting for a block (up to about a million transactions or 1 GB by default), and inclusion usually takes about a second. Miners pick at random weighted by fee rate cubed, so double the fee rate is 8 times as likely, or take everything when it all fits. A pending transaction can be replaced by one spending one of the same coins at a strictly higher fee rate; one never mined expires after 24 hours.
+Source: https://www.kaspalytics.com/learn/transactions/mempool
 
 ## Wallets
 keys: wallet, wallets, best wallet, which wallet, kaspium, kasware, kastle, kaspa ng, tangem, ledger, kasvault, store kas
@@ -289,8 +329,8 @@ keys: invest, investment, good investment, should i buy, buy now, moon, predicti
 I don't give investment advice or price predictions. Only invest what you can afford to lose, keep your KAS in a wallet you control, and do your own research.
 
 ## Smart contracts
-keys: smart contract, smart contracts, contracts, evm, programmability, defi, vprogs, layer 2, layer two, l2, rollup, rollups, igra, kasplex l2
-Kaspa programmability comes in layers. Its script language already does multisig, timelocks and escrow, and Crescendo (May 2025) let scripts inspect the transaction (KIP-10). Covenants, live since the Toccata hard fork (mid-2026), add rules about where coins can go next, and token standards for them (KCCs) are being drafted. Layer-2s like Kasplex L2 and Igra bring EVM contracts that settle on Kaspa, and native "vProgs" are in research. Send covenants, KIP-10 or SilverScript for more.
+keys: smart contract, smart contracts, contracts, evm, programmability, defi, layer 2, layer two, l2, rollup, rollups, igra, kasplex l2
+Kaspa programmability comes in layers. Its script language already does multisig, timelocks and escrow, and Crescendo (May 2025) let scripts inspect the transaction (KIP-10). Covenants, live since the Toccata hard fork (mid-2026), add rules about where coins can go next, and token standards for them (KCCs) are being drafted. Layer-2s like Kasplex L2 and Igra bring EVM contracts that settle on Kaspa, and native vProgs are in research. Ask about covenants, SilverScript, Argent or vProgs for more.
 Video: https://youtu.be/_8l6XBDu-wQ (What Are Smart Contracts? Does Kaspa Need Them?)
 Video: https://youtu.be/qMRcf1HVQBA (Overview of Kasplex's L2 Smart Contracts)
 Source: https://kaspa.com/learn-kaspa/post/smart-contracts
@@ -351,8 +391,8 @@ There is no trustless way to turn KRC-20 tokens into KCC-20 covenant tokens: KRC
 Source: https://kas-smiths.org/t/exploring-a-trust-minimized-krc-20-to-kcc-20-bridge-on-kaspa-without-relying-on-a-relayer/126
 
 ## Zero-knowledge proofs
-keys: zk, zero knowledge, zero-knowledge, zk proof, zk proofs, groth16, risc zero, risc0, zk verify, verify proofs
-Since Toccata, Kaspa covenants can check zero-knowledge proofs on-chain: Groth16 (small and cheap, but each circuit needs its own trusted setup) and RISC Zero (no setup, but a single check fills about half a block). A proof-gated covenant was demonstrated on mainnet in September 2026. ZK is also the path to trustless bridges and layer-2s.
+keys: kip 16, kip16, kip-16, opzkprecompile, zk, zero knowledge, zero-knowledge, zk proof, zk proofs, groth16, risc zero, risc0, zk verify, verify proofs
+Since Toccata (KIP-16), Kaspa covenants can check zero-knowledge proofs on-chain: Groth16 (small and cheap, but each circuit needs its own trusted setup) and RISC Zero (no setup, but a single check fills about half a block). A proof-gated covenant was demonstrated on mainnet in September 2026. ZK is also the path to trustless bridges and layer-2s.
 Video: https://youtu.be/Wtm-3FjdB3I (What Are ZK-Proofs And What Do They Bring To Kaspa)
 Source: https://kas-smiths.org/t/proof-gated-covenant-ownership-of-kcc20-state-worked-profile-tn10-receipts/140
 
@@ -368,18 +408,28 @@ Source: https://kaspa.com/learn-kaspa/post/kip-10
 
 ## KIP-21
 keys: kip 21, kip21, kip-21, partitioned sequencing, sequencing commitment, lanes, lane
-KIP-21 is a proposal, not yet implemented, to split Kaspa's record of transaction order into separate "lanes", so a zero-knowledge rollup only has to prove its own lane's activity instead of the whole network's. That would make ZK layer-2s much cheaper. It would need a hard fork.
+KIP-21 splits Kaspa's record of transaction order into separate "lanes", one per app, so a zero-knowledge rollup or app only has to prove its own lane's activity instead of the whole network's. That makes ZK layer-2s and "based" ZK apps much cheaper to prove. It went live with the Toccata hard fork in June 2026.
 Video: https://youtu.be/Wtm-3FjdB3I (What Are ZK-Proofs And What Do They Bring To Kaspa)
 Source: https://kaspa.com/learn-kaspa/post/kip-21
 
 ## SilverScript
 keys: silverscript, silver script, programming language, write a contract, contract language, cashscript
-SilverScript is a high-level language for writing Kaspa contracts, inspired by CashScript with a Solidity-like look. It compiles to Kaspa Script and supports KIP-10 introspection and covenants.
+SilverScript is Kaspa's first high-level language for contracts, by Ori Newman (github.com/kaspanet/silverscript), inspired by CashScript with a Solidity-like look. A contract compiles (with the silverc tool, or from Rust or Python) to Kaspa Script, and coins are locked to it as a P2SH address; it supports introspection and covenants. It is still experimental: pin versions and test on testnet first.
 Video: https://youtu.be/b9WASoAO23M (What SilverScript Brings To Kaspa)
 Source: https://kaspa.com/learn-kaspa/post/smart-contracts
 
+## Argent
+keys: argent, argent language, actor, actors, multi contract, multicontract, several covenants
+Argent is a newer language, by Michael Sutton, for apps made of several covenants working together. Each part is an "actor" with its own state and covenant ID, and the compiler turns the whole app into plain SilverScript that can be audited. It was still in active development and not ready for real money as of mid-2026. It is not related to the Ethereum wallet of the same name. Code: github.com/argent-lang/argent
+Source: https://www.kaspalytics.com/learn/programmability/argent
+
+## vProgs
+keys: vprogs, vprog, v progs, verifiable programs, verifiable program, synchronous composability, synchronous composition, shared state
+vProgs (verifiable programs) are the long-term goal for Kaspa programmability: programs with shared state that can call each other in one step (synchronous composition), proven with zero-knowledge proofs and settled on Kaspa. They build on covenants and SilverScript and are research for a future hard fork: not part of Toccata and not live. The work is public at github.com/kaspanet/vprogs.
+Source: https://www.kaspalytics.com/learn/programmability/vprogs
+
 ## Kaspa Script and opcodes
-keys: script, kaspa script, opcode, opcodes, multisig, multi sig, timelock, time lock, escrow, schnorr, ecdsa, p2sh
+keys: script, kaspa script, opcode, opcodes, multisig, multi sig, timelock, time lock, escrow, schnorr, ecdsa
 Kaspa Script is a small stack language like Bitcoin's: every coin has a lock (a script) and spending it needs the matching key. It supports Schnorr and ECDSA signatures, M-of-N multisig, timelocks and script-hash (P2SH) addresses, with limits that keep validation fast. A tip: a timelock branch must still require a signature, or anyone can spend after the time passes.
 Source: https://kaspa.com/learn-kaspa/post/opcodes
 
@@ -405,7 +455,7 @@ Video: https://youtu.be/F-1TDozqCrU (Verify The Kaspa You Hold Against Your Own 
 
 ## Running a node
 keys: node, run a node, full node, kaspad, rusty kaspa, rusty-kaspa, self host, requirements, hardware for node
-Run a node with kaspad from Rusty Kaspa (the Rust implementation), or let Kaspa Quick Start set one up with a click. Plan for a modern 4 to 8 core machine, at least 16 GB of RAM and a fast SSD. A new node doesn't replay history from 2021: it downloads a recent snapshot of all coins, checks it against the commitment in the block headers, and syncs quickly.
+Run a node with kaspad from Rusty Kaspa (the Rust implementation), or let Kaspa Quick Start set one up with a click. Plan for at least 8 cores, 16 GB of RAM and a 640 GB SSD (12 to 16 cores, 32 GB and 1 TB is better). A new node doesn't replay history from 2021: it downloads a recent snapshot of all coins, checks it against the commitment in the block headers, and syncs quickly.
 Video: https://youtu.be/4rBgVqUBiiw (How To Run A Kaspa Node)
 Video: https://youtu.be/y_hYjNp1UIc (How To Make Your Kaspa Node Public)
 Video: https://youtu.be/jHU-UKIZUOg (Connect Kaspium And KasWare To Your Node)
@@ -422,7 +472,7 @@ Every Kaspa block header commits to the whole set of coins (a MuHash of the UTXO
 Source: https://kaspa.com/learn-kaspa/post/kaspa-linking-the-body-to-the-header
 
 ## Inside a block
-keys: block header, inside a block, anatomy of a block, nonce, merkle root, coinbase, header fields, what is in a block
+keys: block header, inside a block, anatomy of a block, nonce, merkle root, header fields, what is in a block
 A Kaspa block is a header plus transactions. The header lists its parents, Merkle roots for its own and its accepted transactions, a commitment to all coins, the timestamp in milliseconds, difficulty, a 64-bit nonce, DAA score, blue score, blue work and the pruning point. The first transaction is the coinbase, which pays the miner.
 Source: https://kaspa.com/learn-kaspa/post/anatomy-of-a-block
 
@@ -438,16 +488,27 @@ Video: https://youtu.be/AuSOaZrQq4o (Kaspa On Rust: What Does This Mean?)
 
 ## Node ports
 keys: port, ports, what ports, which ports, ports does, node ports, open ports, 16111, 16110, 17110, 18110, grpc, wrpc, rpc, p2p port, firewall
-Mainnet node ports: 16111 for peers (p2p), 16110 for gRPC, 17110 for wRPC (Borsh) and 18110 for wRPC (JSON). Only 16111 needs to be open to the internet for incoming peers.
+Mainnet node ports: 16111 for peers (p2p), 16110 for gRPC, 17110 for wRPC (Borsh) and 18110 for wRPC (JSON). Only 16111 needs to be open to the internet for incoming peers. Testnet 10 uses 16211, 16210, 17210 and 18210.
 Video: https://youtu.be/y_hYjNp1UIc (How To Make Your Kaspa Node Public)
 
 ## Testnet
-keys: testnet, test net, tn10, testnet 10, faucet, test coins, test kas
-Kaspa's public testnet is Testnet 10, with "kaspatest:" addresses and free test coins from a faucet. Use it to try things without real KAS.
+keys: tn12, testnet 12, covenant testnet, testnet, test net, tn10, testnet 10, faucet, test coins, test kas
+Kaspa's public testnet is Testnet 10 (TN10), with "kaspatest:" addresses and free test coins from the faucet at faucet-tn10.kaspanet.io. Use it to try things without real KAS. Testnet 12 (faucet-tn12.kaspanet.io) is a separate network for covenant experiments.
+Source: https://www.kaspalytics.com/learn/development/resources
+
+## SDKs
+keys: sdk, sdks, build an app, rust sdk, python sdk, wasm, wasm sdk, javascript, typescript, js sdk, npm, pip install kaspa, wrpc client, kaspa library, code library, program kaspa
+For Rust, use the rusty-kaspa repo itself (github.com/kaspanet/rusty-kaspa) as a git dependency. For JavaScript or TypeScript, use the WASM SDK zip from the rusty-kaspa releases page, not the old npm packages (docs at kaspa.aspectron.org/docs). For Python, pip install kaspa (docs at kaspanet.github.io/kaspa-python-sdk). They talk to a node over wRPC, so start the node with --rpclisten-borsh.
+Source: https://www.kaspalytics.com/learn/development/sdks
+
+## Developer resources
+keys: developer resources, dev resources, developer docs, dev docs, research forum, deepwiki, mdbook, public nodes, public node, pnn, workshop, workshops, start building
+Good places to start building: the Kaspa MDBook (kaspa-mdbook.aspectron.com), DeepWiki for the rusty-kaspa code (deepwiki.com/kaspanet/rusty-kaspa), the research forum (research.kas.pa), the Kas-Smiths builders forum (kas-smiths.org), a list of public nodes (pnn.kaspa.stream) and test coins from faucet-tn10.kaspanet.io. Core developers talk in public at t.me/kasparnd.
+Source: https://www.kaspalytics.com/learn/development/resources
 
 ## Security and 51% attacks
 keys: security, secure, 51, 51 percent, attack, attacks, double spend, double spending, safe
-Kaspa is secured by proof-of-work, like Bitcoin: an attacker would need more than half of all the mining power. GHOSTDAG keeps that security at 10 blocks per second, where an ordinary blockchain would weaken, and nodes refuse any reorganization deeper than the finality depth (12 hours).
+Kaspa is secured by proof-of-work, like Bitcoin: an attacker would need more than half of all the mining power. GHOSTDAG keeps that security at 10 blocks per second, where an ordinary blockchain would weaken, and nodes refuse any reorganization deeper than the finality depth (12 hours). If two parallel blocks spend the same coin, GHOSTDAG's order accepts the first and rejects the other.
 Source: https://kaspa.com/learn-kaspa/post/finality-depth
 
 ## Is it a Bitcoin fork
@@ -456,7 +517,8 @@ No. Kaspa shares Bitcoin's core ideas (proof-of-work, UTXOs, a fixed supply) but
 
 ## Kaspa Improvement Proposals
 keys: kip, kips, improvement proposal, proposal, governance, roadmap, who decides
-Changes to Kaspa are written up as KIPs (Kaspa Improvement Proposals), discussed in public on GitHub (kaspanet/kips), and adopted when node operators and miners run the new software.
+Changes to Kaspa are written up as KIPs (Kaspa Improvement Proposals), discussed in public on GitHub (kaspanet/kips), and adopted when node operators and miners run the new software. Crescendo brought KIP-4, 9, 10, 13 and 14; Toccata brought KIP-16, 17, 20 and 21; DAGKnight (KIP-2) is still a proposal.
+Source: https://www.kaspalytics.com/learn/kips
 
 ## Official links
 keys: website, official, links, discord, twitter, community, docs, documentation
@@ -464,7 +526,7 @@ Start at kaspa.org: it links the official community channels, docs and wallets. 
 
 ## Learn more
 keys: learn more, learn kaspa, deep dive, technical, how does it work, resources, articles, read more, education
-For deeper reading, the "Learn Kaspa" articles on kaspa.com explain the BlockDAG, GHOSTDAG, finality, pruning, KIPs and smart contracts step by step, and kaspa.org links the docs and the research papers. Core developers discuss research in public in the Kaspa Core R&D Telegram group: t.me/kasparnd
+For deeper reading, the "Learn Kaspa" articles on kaspa.com explain the BlockDAG, GHOSTDAG, finality, pruning, KIPs and smart contracts step by step; kaspalytics.com/learn walks through the blockDAG, mining, transactions, fees and covenants with the network's exact numbers, and kaspa.org links the docs and research papers. Core developers discuss research in public in the Kaspa Core R&D Telegram group: t.me/kasparnd
 Source: https://kaspa.com/learn-kaspa
 
 ## Core developer discussions
@@ -492,4 +554,5 @@ Kaspa Quick Start is a control panel that installs and runs a Kaspa node with a 
 
 ## About this bot
 keys: who are you, what are you, are you a bot, are you ai, this bot, about you, how do you work, are you human
-I'm a KaChat bot with fixed answers to common Kaspa questions, written by hand and checked, not generated. Every answer is a small Kaspa transaction paid from my own wallet, so I answer a few questions per person each day. Send topics to see everything I know.
+I'm a KaChat bot with fixed answers to common Kaspa questions, written by hand and checked, not generated. Every answer is a small Kaspa transaction paid from my own wallet, so I keep my answers short. Send topics to see everything I know.
+
