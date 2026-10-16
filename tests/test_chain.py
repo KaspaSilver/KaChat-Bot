@@ -213,9 +213,9 @@ def test_indexer_backfill_fills_gaps(tmp_path):
         def __init__(self, rows):
             self.rows = rows
 
-        def by_inbox(self, tag, block_time, limit):
+        def inbox_page(self, tag, block_time, limit):
             assert tag == d.bots["mining-1"].inbox_tag
-            return [{"txid": "f1" * 32, "sender": USER, "block_time": 1, "b64": ""}]
+            return [{"txid": "f1" * 32, "sender": USER, "block_time": 1, "b64": ""}], 1, 1
 
         def by_sender(self, sender, alias, block_time, limit):
             assert alias == watch_alias(BOT_KEY, sender)
@@ -347,11 +347,11 @@ def test_backfill_reads_every_first_contact_page(tmp_path):
             self.inbox_calls = []
             self.asked = set()
 
-        def by_inbox(self, tag, block_time, limit):
+        def inbox_page(self, tag, block_time, limit):
             self.inbox_calls.append(block_time)
             rows = [{"txid": f"{i:064x}", "sender": s, "block_time": 1000 + i, "b64": ""}
-                    for i, s in enumerate(senders) if 1000 + i > block_time]
-            return rows[:limit]
+                    for i, s in enumerate(senders) if 1000 + i >= block_time][:limit]
+            return rows, len(rows), rows[-1]["block_time"] if rows else block_time
 
         def by_sender(self, sender, alias, block_time, limit):
             self.asked.add(sender)
@@ -369,3 +369,91 @@ def test_backfill_reads_every_first_contact_page(tmp_path):
         for t in d.workers.values():
             t.cancel()
     asyncio.run(go())
+
+
+class _RawInbox:
+    """The indexer's by-inbox route over raw rows (block_time inclusive, at most `limit`), for a
+    real IndexerClient: rows it can't read still fill the page, as on the live indexer."""
+
+    def __init__(self, raw):
+        self.raw = sorted(raw, key=lambda r: r["block_time"])
+        self.calls = []
+
+    def __call__(self, req, timeout=None):
+        import io, json, urllib.parse
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(req.full_url).query))
+        if "by-inbox" not in req.full_url:
+            body = []
+        else:
+            since, limit = int(q["block_time"]), int(q["limit"])
+            self.calls.append((since, limit))
+            body = [r for r in self.raw if r["block_time"] >= since][:limit]
+
+        class Resp(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        return Resp(json.dumps(body).encode())
+
+
+def _raw_row(i, sender, block_time, payload="kchat:1:dm:x:AAAA"):
+    return {"tx_id": f"{i:064x}", "sender": sender, "block_time": block_time,
+            "message_payload": payload.encode("latin-1").hex()}
+
+
+def _asked_senders(tmp_path, raw):
+    from kachat.chain import IndexerClient
+    asked = set()
+    opener = _RawInbox(raw)
+    client = IndexerClient("http://indexer", opener=opener)
+    client.by_sender = lambda sender, alias, block_time, limit: asked.add(sender) or []
+
+    async def go():
+        d, node, be = make_daemon(tmp_path)
+        d.reload_config()
+        bot = d.bots["mining-1"]
+        bot.data["indexerCursorMs"] = 1
+        d.indexer = client
+        await d.backfill(bot)
+        for t in d.workers.values():
+            t.cancel()
+        return bot.data["indexerCursorMs"]
+    return asked, opener.calls, asyncio.run(go())
+
+
+def test_backfill_pages_past_unreadable_rows(tmp_path):
+    """BOT-011 (run 9): a row with a non-text payload in a full page doesn't end the paging."""
+    senders = [addr(f"{0x40 + i:02x}" * 32) for i in range(150)]
+    raw = [_raw_row(i, s, 1000 + i) for i, s in enumerate(senders)]
+    raw[10] = _raw_row(10, senders[10], 1010, "kchat:1:dm:x:\xff\xfe")      # junk inside page one
+    asked, calls, _ = _asked_senders(tmp_path, raw)
+    assert len(calls) == 2
+    assert set(senders) - {senders[10]} <= asked
+
+
+def test_backfill_reads_a_crowded_block_time(tmp_path):
+    """BOT-011 (run 9): more than a page of first contacts at one block time are all read."""
+    senders = [addr(f"{i + 0x4000:04x}" * 16) for i in range(180)]
+    raw = [_raw_row(i, s, 5000) for i, s in enumerate(senders[:150])]
+    raw += [_raw_row(200 + i, s, 6000 + i) for i, s in enumerate(senders[150:])]
+    asked, calls, _ = _asked_senders(tmp_path, raw)
+    assert calls[:2] == [(1, 100), (5000, 100)] and calls[2] == (5000, 500)
+    assert set(senders) <= asked
+
+
+def test_backfill_cursor_stays_when_not_done(tmp_path):
+    """BOT-011 (run 9): when the run stops before a short page, the cursor only moves to the last
+    block time read, never to now."""
+    import kachat.daemon as daemon
+    senders = [addr(f"{0x40 + i:02x}" * 32) for i in range(150)]
+    raw = [_raw_row(i, s, 1000 + i) for i, s in enumerate(senders)]
+    old = daemon.INBOX_PAGES
+    daemon.INBOX_PAGES = 1
+    try:
+        _, calls, cursor = _asked_senders(tmp_path, raw)
+    finally:
+        daemon.INBOX_PAGES = old
+    assert calls == [(1, 100)] and cursor == 1099
+

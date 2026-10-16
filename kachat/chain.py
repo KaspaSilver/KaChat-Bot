@@ -217,9 +217,24 @@ class IndexerClient:
                         "block_time": int(r.get("block_time") or 0), "b64": b64})
         return out
 
+    def inbox_page(self, tag: str, block_time_ms: int, limit: int = 100) -> Tuple[List[dict], int, int]:
+        """One by-inbox page: the readable rows, plus how many rows the indexer actually sent and
+        the last block_time among them. Paging must go by the last two, since rows dropped here
+        (a payload that isn't text) still fill the indexer's page (BOT-011)."""
+        raw = self._get("/contextual-messages/by-inbox",
+                        {"tag": tag, "block_time": block_time_ms, "limit": limit})
+        raw = raw if isinstance(raw, list) else []
+        last = block_time_ms
+        for r in raw:
+            if isinstance(r, dict):
+                try:
+                    last = max(last, int(r.get("block_time") or 0))
+                except (TypeError, ValueError):
+                    pass
+        return self._rows(raw), len(raw), last
+
     def by_inbox(self, tag: str, block_time_ms: int, limit: int = 100) -> List[dict]:
-        return self._rows(self._get("/contextual-messages/by-inbox",
-                                    {"tag": tag, "block_time": block_time_ms, "limit": limit}))
+        return self.inbox_page(tag, block_time_ms, limit)[0]
 
     def by_sender(self, sender: str, alias: str, block_time_ms: int, limit: int = 50) -> List[dict]:
         return self._rows(self._get("/contextual-messages/by-sender",

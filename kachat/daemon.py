@@ -35,7 +35,8 @@ CONFIG_POLL = 5.0
 INDEXER_EVERY = 300.0
 INDEXER_OVERLAP_MS = 15 * 60 * 1000
 INBOX_PAGE = 100
-INBOX_PAGES = 50         # at most 5,000 first contacts per backfill run; the rest the next run
+INBOX_PAGES = 50         # at most 50 pages per backfill run; the rest the next run
+INBOX_PAGE_MAX = 500     # the indexer's biggest page, for one block time with more than INBOX_PAGE rows
 SPENT_KEEP = 120.0
 HEARTBEAT_EVERY = 5.0
 
@@ -438,21 +439,31 @@ class Daemon:
         started_ms = int(time.time() * 1000)
         cursor = int(bot.data.get("indexerCursorMs") or int(bot.data.get("createdAt", time.time())) * 1000)
         senders = set()
-        # Every first contact since the cursor, page by page (BOT-011: one page of 100 used to be
-        # all, and the cursor then moved past the rest). Capped; when the cap is hit the cursor
-        # only moves to the last row read, and the next run carries on from there.
+        # Every first contact since the cursor, page by page (BOT-011). Paging goes by what the
+        # indexer sent, not by the rows left after dropping unreadable ones, and the indexer's
+        # block_time is inclusive: a full page that is all one block time is asked again with the
+        # biggest limit, and only past that is the rest of that millisecond given up (logged).
+        # Unless the last page was a real short one, the cursor only moves to the last block
+        # time read, and the next run carries on from there.
         inbox_since = cursor
-        capped = False
-        for page_no in range(INBOX_PAGES):
-            rows = await asyncio.to_thread(self.indexer.by_inbox, bot.inbox_tag, inbox_since, INBOX_PAGE)
+        limit = INBOX_PAGE
+        complete = False
+        for _ in range(INBOX_PAGES):
+            rows, sent, last = await asyncio.to_thread(self.indexer.inbox_page, bot.inbox_tag, inbox_since, limit)
             for r in rows:
                 if r["sender"]:
                     senders.add(r["sender"])
-            if len(rows) < INBOX_PAGE or rows[-1]["block_time"] <= inbox_since:
+            if sent < limit:
+                complete = True
                 break
-            inbox_since = rows[-1]["block_time"]
-            if page_no == INBOX_PAGES - 1:
-                capped = True
+            if last > inbox_since:
+                inbox_since, limit = last, INBOX_PAGE
+            elif limit < INBOX_PAGE_MAX:
+                limit = INBOX_PAGE_MAX
+            else:
+                log.warning("[%s] indexer backfill: over %d first contacts at block time %d; skipping the rest of it",
+                            bot.id, INBOX_PAGE_MAX, inbox_since)
+                inbox_since, limit = inbox_since + 1, INBOX_PAGE
         senders |= bot.known_senders()
         for s in sorted(senders):
             try:
@@ -476,10 +487,10 @@ class Daemon:
                 if len(page) < 50 or page[-1]["block_time"] <= since:
                     break
                 since = page[-1]["block_time"]
-        if capped:
-            bot.data["indexerCursorMs"] = max(cursor, inbox_since)
-        else:
+        if complete:
             bot.data["indexerCursorMs"] = max(cursor, started_ms - INDEXER_OVERLAP_MS)
+        else:
+            bot.data["indexerCursorMs"] = max(cursor, inbox_since)
         bot.save()
 
     async def process_outbox(self) -> None:
