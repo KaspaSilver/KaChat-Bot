@@ -320,7 +320,7 @@ def test_price_starting_above_does_not_alert(make_bot, ctxf):
 def test_price_move_uses_api_change_until_history(make_bot, ctxf):
     bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "10"])
     run(bot.observe(ctxf.clock.t, 0.05, 12.5))
-    assert "up 12.5% in 24h" in texts(ctxf)[-1]
+    assert texts(ctxf)[-1].startswith("🟢 KAS is up 12.5% in 24h")
     run(bot.observe(ctxf.clock.t + 60, 0.05, 13.0))
     assert len(ctxf.sent) == 1
     run(bot.observe(ctxf.clock.t + 120, 0.05, 2.0))      # calmed down: re-armed
@@ -335,7 +335,7 @@ def test_price_move_from_own_samples(make_bot, ctxf):
         run(bot.observe(t + i * 300, 0.040, None))
     assert ctxf.sent == []
     run(bot.observe(t + 24 * 3600 + 400, 0.035, None))
-    assert "down 12.5% in 24h" in texts(ctxf)[-1]
+    assert texts(ctxf)[-1].startswith("🔴 KAS is down 12.5% in 24h")
 
 
 def test_price_daily_summary_once(make_bot, ctxf):
@@ -682,3 +682,13 @@ def test_spending_a_reward_is_not_mistaken_for_a_reorg(make_bot, ctxf):
     run(bot.on_utxos(WATCH, [_entry("c" * 64, 387_000_000)], [second]))
     settle(bot, ctxf)
     assert sum("Block reward" in t for t in texts(ctxf)) == 2
+
+
+def test_price_daily_summary_shows_red_or_green(make_bot, ctxf):
+    bot = paired(make_bot, ctxf, "price", ["no", "no", "no", "no"])
+    bot.price = 0.04
+    bot.api_change = -3.2
+    assert "(🔴 -3.2% 24h)" in bot.daily_text(ctxf.clock.t)
+    bot.api_change = 4.0
+    assert "(🟢 +4.0% 24h)" in bot.daily_text(ctxf.clock.t)
+

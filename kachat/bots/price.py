@@ -22,6 +22,11 @@ SAMPLE_EVERY = 300.0          # persisted samples, 5 min apart, 25 h kept
 DAY = 24 * 3600
 REARM = 0.01
 DAILY_WINDOW = 3 * 3600       # a missed daily summary is not sent more than 3 h late
+UP, DOWN = "🟢", "🔴"           # on every % in a notification: green up, red down
+
+
+def trend(change: float) -> str:
+    return UP if change >= 0 else DOWN
 
 
 def fmt_price(p: Optional[float], currency: str = "usd") -> str:
@@ -266,10 +271,10 @@ class PriceBot(Bot):
             if ch is not None:
                 if ch >= move and ma.get("up", True):
                     ma["up"] = False
-                    msgs.append(f"KAS is up {ch:.1f}% in 24h: {fmt_price(price, self.currency)}")
+                    msgs.append(f"{UP} KAS is up {ch:.1f}% in 24h: {fmt_price(price, self.currency)}")
                 elif ch <= -move and ma.get("down", True):
                     ma["down"] = False
-                    msgs.append(f"KAS is down {abs(ch):.1f}% in 24h: {fmt_price(price, self.currency)}")
+                    msgs.append(f"{DOWN} KAS is down {abs(ch):.1f}% in 24h: {fmt_price(price, self.currency)}")
                 if ch < move / 2:
                     ma["up"] = True
                 if ch > -move / 2:
@@ -295,7 +300,7 @@ class PriceBot(Bot):
         lo, hi = self.range_24h(now)
         line = f"KAS today: {fmt_price(self.price, self.currency)}"
         if ch is not None:
-            line += f" ({ch:+.1f}% 24h)"
+            line += f" ({trend(ch)} {ch:+.1f}% 24h)"
         if lo is not None and hi is not None and hi > lo:
             line += f"\n24h range: {fmt_price(lo, self.currency)} - {fmt_price(hi, self.currency)}"
         return line
